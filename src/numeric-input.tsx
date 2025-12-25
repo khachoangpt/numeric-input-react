@@ -23,6 +23,7 @@ type NumericInputProps = ComponentProps<'input'> & {
   allowNegative?: boolean
   minValue?: number
   maxValue?: number
+  maxDecimalPlaces?: number
 }
 
 /**
@@ -38,6 +39,13 @@ const convertFullWidthToHalfWidth = (str: string): string => {
     .replace(/[．]/g, '.') // Convert full-width period (．) to half-width (.)
     .replace(/[，]/g, ',') // Convert full-width comma (，) to half-width (,)
     .replace(/[－]/g, '-') // Convert full-width minus (－) to half-width (-)
+}
+
+/**
+ * Escapes special regex characters in a string
+ */
+const escapeRegex = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -115,8 +123,15 @@ function NumericInput({
   allowNegative = false,
   minValue,
   maxValue,
+  maxDecimalPlaces,
   ...props
 }: NumericInputProps) {
+  // Validate min/max values
+  if (minValue !== undefined && maxValue !== undefined && minValue > maxValue) {
+    console.warn(
+      'NumericInput: minValue should be less than or equal to maxValue',
+    )
+  }
   const isComposing = useRef(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
   // Store the raw input value during IME composition
@@ -173,6 +188,10 @@ function NumericInput({
       // Convert full-width Japanese characters to half-width
       let rawValue = convertFullWidthToHalfWidth(inputValue)
 
+      // Remove scientific notation (e.g., "1e10", "1E10")
+      // This prevents unexpected number conversions
+      rawValue = rawValue.replace(/[eE]/g, '')
+
       // Normalize the input (remove invalid chars, handle decimals, negatives)
       rawValue = normalizeNumericInput(
         rawValue,
@@ -180,6 +199,18 @@ function NumericInput({
         allowNegative,
         maxLength,
       )
+
+      // Limit decimal places if specified
+      if (maxDecimalPlaces !== undefined && allowDecimal) {
+        const decimalIndex = rawValue.indexOf('.')
+        if (decimalIndex !== -1) {
+          const integerPart = rawValue.slice(0, decimalIndex)
+          const decimalPart = rawValue.slice(decimalIndex + 1)
+          if (decimalPart.length > maxDecimalPlaces) {
+            rawValue = `${integerPart}.${decimalPart.slice(0, maxDecimalPlaces)}`
+          }
+        }
+      }
 
       // Handle empty input first (before processing leading zeros)
       if (rawValue === '' || rawValue === '-') {
@@ -332,6 +363,7 @@ function NumericInput({
       separator,
       minValue,
       maxValue,
+      maxDecimalPlaces,
     ],
   )
 
@@ -441,9 +473,15 @@ function NumericInput({
     }
 
     // Convert value to number if it's a string
+    // Escape separator for regex if it exists
     const numValue =
       typeof value === 'string'
-        ? Number(value.replace(new RegExp(`[${separator || ''}]`, 'g'), ''))
+        ? Number(
+            value.replace(
+              new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
+              '',
+            ),
+          )
         : Number(value)
 
     // If the value is 0, only preserve rawInputValue if it's "0", "-0", "0.", or "-0."
@@ -483,9 +521,15 @@ function NumericInput({
         return ''
       }
       // Convert value to number if it's a string
+      // Escape separator for regex if it exists
       const numValue =
         typeof value === 'string'
-          ? Number(value.replace(new RegExp(`[${separator || ''}]`, 'g'), ''))
+          ? Number(
+              value.replace(
+                new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
+                '',
+              ),
+            )
           : Number(value)
       // If value is 0 and rawInputValue is empty, don't show anything
       if (numValue === 0) {
@@ -514,9 +558,15 @@ function NumericInput({
     }
 
     // Convert value to number if it's a string
+    // Escape separator for regex if it exists
     const numValue =
       typeof value === 'string'
-        ? Number(value.replace(new RegExp(`[${separator || ''}]`, 'g'), ''))
+        ? Number(
+            value.replace(
+              new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
+              '',
+            ),
+          )
         : Number(value)
 
     // Allow displaying "0" if rawInputValue is "0"
@@ -533,10 +583,14 @@ function NumericInput({
     return formatValue(numValue)
   }, [value, formatValue, separator, composingValue, rawInputValue])
 
+  // Determine appropriate inputMode for mobile keyboards
+  const inputMode = allowDecimal ? 'decimal' : 'numeric'
+
   return (
     <input
       ref={inputRef}
       type="text"
+      inputMode={inputMode}
       value={displayValue}
       className={className}
       onCompositionEnd={handleCompositionEnd}
