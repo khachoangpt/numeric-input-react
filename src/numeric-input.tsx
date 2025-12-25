@@ -557,4 +557,4 @@ function NumericInput({
 
 export { NumericInput }
 
-export type { NumericInputValue,NumericInputProps }
+export type { NumericInputValue, NumericInputProps }
