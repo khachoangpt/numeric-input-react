@@ -7,6 +7,7 @@ A React component for handling numeric input with advanced features including de
 - ✅ **Decimal number support** - Allow or disallow decimal points
 - ✅ **Negative number support** - Optional negative number input
 - ✅ **Thousands separator** - Customizable separator for number formatting
+- ✅ **Min/Max value validation** - Set minimum and maximum value constraints
 - ✅ **Full-width character conversion** - Automatically converts full-width Japanese characters (０-９, ．, ，, －) to half-width equivalents
 - ✅ **IME composition handling** - Properly handles IME input methods
 - ✅ **Leading zero handling** - Smart handling of leading zeros
@@ -52,6 +53,8 @@ Extends all standard HTML input props (`ComponentProps<'input'>`) with the follo
 | `separator` | `string` | `undefined` | Thousands separator (e.g., `","` for comma, `" "` for space) |
 | `allowDecimal` | `boolean` | `false` | Whether to allow decimal point input |
 | `allowNegative` | `boolean` | `false` | Whether to allow negative numbers |
+| `minValue` | `number` | `undefined` | Minimum allowed value. Values below this will be clamped to `minValue` |
+| `maxValue` | `number` | `undefined` | Maximum allowed value. Values above this will be clamped to `maxValue` |
 
 ### NumericInputValue
 
@@ -108,6 +111,17 @@ type NumericInputValue = {
 />
 ```
 
+### With min/max value constraints
+
+```tsx
+<NumericInput
+  minValue={0}
+  maxValue={100}
+  onValueChange={(val) => console.log(val.value)}
+  placeholder="Enter number (0-100)"
+/>
+```
+
 ### Full example with all features
 
 ```tsx
@@ -125,7 +139,9 @@ function PriceInput() {
         allowDecimal={true}
         allowNegative={false}
         separator=","
-        placeholder="Enter price"
+        minValue={0}
+        maxValue={1000000}
+        placeholder="Enter price (0 - 1,000,000)"
         className="price-input"
       />
       <p>Value: {price.value}</p>
@@ -152,6 +168,15 @@ function PriceInput() {
 - If `allowNegative` is `false`, negative signs are removed
 - Multiple negative signs are normalized to a single sign at the start
 
+### Min/Max Value Validation
+- Values are automatically clamped to the `minValue` and `maxValue` range when the input is complete
+- Intermediate values (e.g., values ending with `.` or during typing) are allowed temporarily for better UX
+- Values are validated and clamped when:
+  - The input value is complete (not ending with decimal point)
+  - The input loses focus (on blur)
+- If a value exceeds the maximum, it will be clamped to `maxValue`
+- If a value is below the minimum, it will be clamped to `minValue`
+
 ### Full-width Character Conversion
 The component automatically converts full-width Japanese characters to half-width:
 - `０-９` → `0-9`
@@ -167,7 +192,7 @@ The component properly handles IME (Input Method Editor) composition events, ens
 The library is written in TypeScript and includes full type definitions:
 
 ```typescript
-import { NumericInput, type NumericInputProps } from 'numeric-input-react'
+import { NumericInput, type NumericInputProps, type NumericInputValue } from 'numeric-input-react'
 ```
 
 ## License

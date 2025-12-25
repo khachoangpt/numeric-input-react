@@ -21,6 +21,8 @@ type NumericInputProps = ComponentProps<'input'> & {
   separator?: string
   allowDecimal?: boolean
   allowNegative?: boolean
+  minValue?: number
+  maxValue?: number
 }
 
 /**
@@ -111,6 +113,8 @@ function NumericInput({
   maxLength,
   allowDecimal = false,
   allowNegative = false,
+  minValue,
+  maxValue,
   ...props
 }: NumericInputProps) {
   const isComposing = useRef(false)
@@ -278,20 +282,45 @@ function NumericInput({
       const endsWithDecimalPoint =
         allowDecimal && rawValue.endsWith('.') && !rawValue.endsWith('..')
 
+      // Apply min/max validation only for complete numbers (not intermediate typing states)
+      // Allow intermediate values while typing (e.g., allow "1000" if max is 100, user might be typing "100")
+      let finalValue = valueAsNumber
+      let finalRawValue = rawValue
+      let shouldClamp = false
+
+      // Only clamp if the value is complete (not ending with decimal point and not a single zero pattern)
+      if (!isSingleZero && !endsWithDecimalPoint) {
+        if (minValue !== undefined && finalValue < minValue) {
+          finalValue = minValue
+          finalRawValue = minValue.toString()
+          shouldClamp = true
+        }
+        if (maxValue !== undefined && finalValue > maxValue) {
+          finalValue = maxValue
+          finalRawValue = maxValue.toString()
+          shouldClamp = true
+        }
+      }
+
+      // If clamped, update rawInputValue
+      if (shouldClamp) {
+        setRawInputValue(finalRawValue)
+      }
+
       // If it's a single zero pattern or ends with decimal point, use the raw value for display
       if (isSingleZero || endsWithDecimalPoint) {
         // Use the raw value as-is to preserve single "0" or trailing decimal point
         onValueChange({
-          value: valueAsNumber,
-          formattedValue: rawValue,
+          value: finalValue,
+          formattedValue: shouldClamp ? formatValue(finalValue) : rawValue,
         })
         return
       }
 
       // Valid number without leading zeros - format and return
       onValueChange({
-        value: valueAsNumber,
-        formattedValue: formatValue(valueAsNumber),
+        value: finalValue,
+        formattedValue: formatValue(finalValue),
       })
     },
     [
@@ -301,6 +330,8 @@ function NumericInput({
       onValueChange,
       formatValue,
       separator,
+      minValue,
+      maxValue,
     ],
   )
 
@@ -363,6 +394,34 @@ function NumericInput({
         handleValueChange(e.target.value, true)
       }
 
+      // Apply min/max validation on blur for any intermediate values
+      // This ensures values are clamped even if user was typing an out-of-range value
+      if (rawInputValue !== '') {
+        const numValue = Number(rawInputValue)
+        if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+          let clampedValue = numValue
+          let shouldUpdate = false
+
+          if (minValue !== undefined && clampedValue < minValue) {
+            clampedValue = minValue
+            shouldUpdate = true
+          }
+          if (maxValue !== undefined && clampedValue > maxValue) {
+            clampedValue = maxValue
+            shouldUpdate = true
+          }
+
+          if (shouldUpdate) {
+            const clampedString = clampedValue.toString()
+            setRawInputValue(clampedString)
+            onValueChange({
+              value: clampedValue,
+              formattedValue: formatValue(clampedValue),
+            })
+          }
+        }
+      }
+
       // Reset the flag
       hasProcessedComposition.current = false
 
@@ -371,7 +430,7 @@ function NumericInput({
         onBlur(e)
       }
     },
-    [composingValue, onBlur, handleValueChange],
+    [composingValue, onBlur, handleValueChange, rawInputValue, minValue, maxValue, formatValue],
   )
 
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
@@ -498,4 +557,4 @@ function NumericInput({
 
 export { NumericInput }
 
-export type { NumericInputProps }
+export type { NumericInputValue,NumericInputProps }
