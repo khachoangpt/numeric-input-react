@@ -484,7 +484,8 @@ function NumericInput({
           )
         : Number(value)
 
-    // If the value is 0, only preserve rawInputValue if it's "0", "-0", "0.", or "-0."
+    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", or "-0."
+    // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
     if (numValue === 0) {
       const isSingleZero =
         rawInputValue === '0' ||
@@ -492,7 +493,9 @@ function NumericInput({
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
       if (!isSingleZero) {
-        setRawInputValue('')
+        // If value prop is 0 from outside, we should display "0"
+        // Set rawInputValue to "0" so it can be displayed
+        setRawInputValue('0')
       }
       return
     }
@@ -514,8 +517,8 @@ function NumericInput({
       return composingValue
     }
 
-    // If rawInputValue is empty, don't show "0" even if value is 0
-    // This handles the case when user deletes "0" by backspace
+    // If rawInputValue is empty, check if we should display the value prop
+    // This handles both: value prop from outside, and user deleting content
     if (rawInputValue === '') {
       if (value === null || value === undefined || value === '') {
         return ''
@@ -531,10 +534,18 @@ function NumericInput({
               ),
             )
           : Number(value)
-      // If value is 0 and rawInputValue is empty, don't show anything
+      // If value is 0 and rawInputValue is empty, show "0" (value prop from outside)
+      // This allows displaying 0 when it's passed as a prop
+      // Note: If user deletes content, onValueChange is called with formattedValue: '',
+      // and parent should update value prop to null/undefined/'' to hide "0"
       if (numValue === 0) {
-        return ''
+        return '0'
       }
+      // For non-zero values, format and display them
+      if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+        return formatValue(numValue)
+      }
+      return ''
     }
 
     // If we have a raw input value with single zero or ending with decimal point, use it for display
@@ -569,17 +580,11 @@ function NumericInput({
           )
         : Number(value)
 
-    // Allow displaying "0" if rawInputValue is "0"
     if (Number.isNaN(numValue)) {
       return ''
     }
 
-    // If the value is 0 and we don't have a raw input value, return empty
-    // But if rawInputValue is "0", we want to show "0"
-    if (numValue === 0 && rawInputValue !== '0') {
-      return ''
-    }
-
+    // Format and return the value
     return formatValue(numValue)
   }, [value, formatValue, separator, composingValue, rawInputValue])
 

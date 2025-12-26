@@ -604,6 +604,20 @@ describe('NumericInput', () => {
       rerender(<NumericInput onValueChange={onValueChange} value="" />)
       expect(input).toHaveValue('')
     })
+
+    it('should display 0 when value prop is 0', () => {
+      render(<NumericInput onValueChange={onValueChange} value={0} />)
+
+      const input = screen.getByRole('textbox')
+      expect(input).toHaveValue('0')
+    })
+
+    it('should display 0 when value prop is "0"', () => {
+      render(<NumericInput onValueChange={onValueChange} value="0" />)
+
+      const input = screen.getByRole('textbox')
+      expect(input).toHaveValue('0')
+    })
   })
 
   describe('IME Composition', () => {
