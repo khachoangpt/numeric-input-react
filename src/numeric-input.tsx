@@ -105,8 +105,38 @@ const normalizeNumericInput = (
   }
 
   // Apply maxLength if specified
-  if (maxLength && normalized.length > maxLength) {
-    normalized = normalized.slice(0, maxLength)
+  // maxLength should only apply to digits, not to minus sign or decimal point
+  if (maxLength) {
+    // Count only digits in the normalized string
+    const digitCount = (normalized.match(/\d/g) || []).length
+    if (digitCount > maxLength) {
+      // Remove excess digits from the end, preserving minus sign and decimal point
+      const hasMinus = normalized.startsWith('-')
+      let result = hasMinus ? '-' : ''
+      let digitsSeen = 0
+      let decimalAdded = false
+      
+      // Start from after minus sign if present
+      for (let i = hasMinus ? 1 : 0; i < normalized.length; i++) {
+        const char = normalized[i]
+        if (/\d/.test(char)) {
+          // Only keep digits up to maxLength
+          if (digitsSeen < maxLength) {
+            result += char
+            digitsSeen++
+          }
+          // Skip excess digits
+        } else if (char === '.' && !decimalAdded) {
+          // Only keep decimal point if we have at least one digit and haven't added one yet
+          if (digitsSeen > 0) {
+            result += char
+            decimalAdded = true
+          }
+        }
+      }
+      
+      normalized = result
+    }
   }
 
   return normalized
