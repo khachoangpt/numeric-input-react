@@ -435,8 +435,11 @@ function NumericInput({
   const handleBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
       // Check if we need to preserve minus sign before processing
-      // Check both half-width and full-width minus
-      const shouldPreserveMinus = allowNegative && (rawInputValue === '-' || rawInputValue === '－')
+      // Check both half-width and full-width minus in rawInputValue and e.target.value
+      const currentValue = e.target.value
+      const isCurrentValueMinus = currentValue === '-' || currentValue === '－'
+      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－'
+      const shouldPreserveMinus = allowNegative && (isRawInputMinus || isCurrentValueMinus)
       
       // If still composing when blur happens, force end composition
       if (isComposing.current) {
@@ -458,8 +461,15 @@ function NumericInput({
         // If we haven't processed composition and there's a value, process it
         // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(e.target.value)
-        // But skip if we need to preserve minus sign and the converted value is not '-'
-        if (!shouldPreserveMinus || convertedValue === '-') {
+        // If current value is minus (full-width or half-width), preserve it
+        if (isCurrentValueMinus && allowNegative) {
+          // Ensure minus sign is preserved as half-width
+          setRawInputValue('-')
+          onValueChange({
+            value: 0,
+            formattedValue: '-',
+          })
+        } else if (!shouldPreserveMinus || convertedValue === '-') {
           handleValueChange(convertedValue, true)
         }
       }
@@ -502,12 +512,17 @@ function NumericInput({
       }
       
       // If we need to preserve minus sign, ensure it's still set as half-width
-      if (shouldPreserveMinus && rawInputValue !== '-') {
-        setRawInputValue('-')
-        onValueChange({
-          value: 0,
-          formattedValue: '-',
-        })
+      // Check both current rawInputValue and the value from input element
+      if (shouldPreserveMinus) {
+        // Convert any full-width minus to half-width
+        const finalMinusValue = '-'
+        if (rawInputValue !== finalMinusValue) {
+          setRawInputValue(finalMinusValue)
+          onValueChange({
+            value: 0,
+            formattedValue: finalMinusValue,
+          })
+        }
       }
 
       // Reset the flag
