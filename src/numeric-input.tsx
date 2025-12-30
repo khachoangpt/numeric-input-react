@@ -38,8 +38,9 @@ const convertFullWidthToHalfWidth = (str: string): string => {
     })
     .replace(/[．]/g, '.') // Convert full-width period (．) to half-width (.)
     .replace(/[，]/g, ',') // Convert full-width comma (，) to half-width (,)
-    .replace(/[－]/g, '-') // Convert full-width minus (－) to half-width (-)
-    .replace(/[ー]/g, '-') // Convert katakana long vowel mark (ー) to minus (-) when used as minus
+    .replace(/[－]/g, '-') // Convert full-width minus (－, U+FF0D) to half-width (-)
+    .replace(/[ー]/g, '-') // Convert katakana long vowel mark (ー, U+30FC) to minus (-) when used as minus
+    .replace(/[−]/g, '-') // Convert mathematical minus sign (−, U+2212) to half-width (-)
 }
 
 /**
@@ -449,10 +450,10 @@ function NumericInput({
     (e: FocusEvent<HTMLInputElement>) => {
       // Check if we need to preserve minus sign before processing
       // Check both half-width and full-width minus in rawInputValue and e.target.value
-      // Also check katakana long vowel mark (ー) which can be used as minus in Japanese
+      // Also check katakana long vowel mark (ー) and mathematical minus sign (−) which can be used as minus
       const currentValue = e.target.value
-      const isCurrentValueMinus = currentValue === '-' || currentValue === '－' || currentValue === 'ー'
-      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー'
+      const isCurrentValueMinus = currentValue === '-' || currentValue === '－' || currentValue === 'ー' || currentValue === '−'
+      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−'
       const shouldPreserveMinus = allowNegative && (isRawInputMinus || isCurrentValueMinus)
       
       // If still composing when blur happens, force end composition
@@ -502,8 +503,8 @@ function NumericInput({
       // But preserve intermediate states like "-" (minus sign only, half-width or full-width)
       if (rawInputValue !== '') {
         // Preserve minus sign only if allowNegative is true - skip clamp validation
-      // Check half-width, full-width minus, and katakana long vowel mark (ー)
-      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')
+      // Check half-width, full-width minus, katakana long vowel mark (ー), and mathematical minus sign (−)
+      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')
         
         if (!isMinusOnly) {
           // Convert to half-width for number conversion
@@ -539,7 +540,7 @@ function NumericInput({
       // Only preserve if the value is just a minus sign, not if it has numbers (those are handled by handleValueChange)
       if (shouldPreserveMinus) {
         // Check if rawInputValue is just a minus sign (not a number with minus)
-        const isJustMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー'
+        const isJustMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−'
         if (isJustMinus) {
           // Convert any full-width minus to half-width
           const finalMinusValue = '-'
@@ -568,8 +569,8 @@ function NumericInput({
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
   useEffect(() => {
     if (value === null || value === undefined || value === '') {
-      // Preserve "-", "－", or "ー" if allowNegative is true and user is typing negative number
-      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')) {
+      // Preserve "-", "－", "ー", or "−" if allowNegative is true and user is typing negative number
+      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')) {
         return
       }
       setRawInputValue('')
@@ -588,7 +589,7 @@ function NumericInput({
           )
         : Number(value)
 
-    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", "-", "－", or "ー"
+    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", "-", "－", "ー", or "−"
     // Also preserve negative numbers when allowNegative is true (user might be typing)
     // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
     if (numValue === 0) {
@@ -598,6 +599,7 @@ function NumericInput({
         rawInputValue === '-' ||
         rawInputValue === '－' ||
         rawInputValue === 'ー' ||
+        rawInputValue === '−' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
       
@@ -623,8 +625,8 @@ function NumericInput({
     // But preserve intermediate states like "-", "－", or "ー" (minus sign only)
     // Also preserve negative numbers that start with minus sign when allowNegative is true
     if (rawInputValue !== '') {
-      // Preserve minus sign only if allowNegative is true (half-width, full-width, and katakana)
-      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')) {
+      // Preserve minus sign only if allowNegative is true (half-width, full-width, katakana, and mathematical minus)
+      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')) {
         // Don't clear rawInputValue if it's just a minus sign
         return
       }
@@ -706,15 +708,15 @@ function NumericInput({
         rawInputValue === '-0' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
-      // Check half-width, full-width minus, and katakana long vowel mark (ー)
-      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')
+      // Check half-width, full-width minus, katakana long vowel mark (ー), and mathematical minus sign (−)
+      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')
       const endsWithDecimalPoint =
         allowDecimal &&
         rawInputValue.endsWith('.') &&
         !rawInputValue.endsWith('..')
       if (isSingleZero || isMinusOnly || endsWithDecimalPoint) {
-        // If it's full-width minus or katakana long vowel mark, convert to half-width for display
-        if (rawInputValue === '－' || rawInputValue === 'ー') {
+        // If it's full-width minus, katakana long vowel mark, or mathematical minus sign, convert to half-width for display
+        if (rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−') {
           return '-'
         }
         return rawInputValue
