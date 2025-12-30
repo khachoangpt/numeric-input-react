@@ -822,6 +822,59 @@ describe('NumericInput', () => {
       })
     })
 
+    it('should preserve minus sign when typing ー then numbers and pressing Enter', async () => {
+      const { rerender } = render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Type full-width minus (ー)
+      fireEvent.change(input, { target: { value: 'ー' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+
+      // Continue typing numbers
+      fireEvent.change(input, { target: { value: 'ー123' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-123')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: -123,
+          formattedValue: '-123',
+        })
+      })
+
+      // Simulate parent component updating value prop to -123 (what onValueChange returned)
+      rerender(
+        <NumericInput 
+          onValueChange={onValueChange} 
+          allowNegative={true} 
+          value={-123}
+        />,
+      )
+
+      // Value should still be displayed
+      await waitFor(() => {
+        expect(input).toHaveValue('-123')
+      })
+
+      // Press Enter (which triggers blur)
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+      fireEvent.blur(input)
+
+      // Minus sign should still be displayed after Enter
+      await waitFor(() => {
+        expect(input).toHaveValue('-123')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: -123,
+          formattedValue: '-123',
+        })
+      })
+    })
+
     it('should preserve minus sign when value prop is updated to 0', async () => {
       const { rerender } = render(
         <NumericInput onValueChange={onValueChange} allowNegative={true} />,

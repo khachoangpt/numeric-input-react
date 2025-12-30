@@ -1,6 +1,6 @@
 {
   "name": "numeric-input-react",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "A React component for handling numeric input with decimal support, negative numbers, thousands separators, and IME composition handling",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

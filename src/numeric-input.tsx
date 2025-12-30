@@ -493,17 +493,8 @@ function NumericInput({
         // If we haven't processed composition and there's a value, process it
         // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(e.target.value)
-        // If current value is minus (full-width or half-width), preserve it
-        if (isCurrentValueMinus && allowNegative) {
-          // Ensure minus sign is preserved as half-width
-          setRawInputValue('-')
-          onValueChange({
-            value: 0,
-            formattedValue: '-',
-          })
-        } else if (!shouldPreserveMinus || convertedValue === '-') {
-          handleValueChange(convertedValue, true)
-        }
+        // Process the value - handleValueChange will preserve minus sign if present
+        handleValueChange(convertedValue, true)
       }
 
       // Apply min/max validation on blur for any intermediate values
@@ -543,18 +534,24 @@ function NumericInput({
         }
       }
       
-      // If we need to preserve minus sign, ensure it's still set as half-width
+      // If we need to preserve minus sign (only when value is just minus, no numbers), ensure it's still set as half-width
       // Check both current rawInputValue and the value from input element
+      // Only preserve if the value is just a minus sign, not if it has numbers (those are handled by handleValueChange)
       if (shouldPreserveMinus) {
-        // Convert any full-width minus to half-width
-        const finalMinusValue = '-'
-        if (rawInputValue !== finalMinusValue) {
-          setRawInputValue(finalMinusValue)
-          onValueChange({
-            value: 0,
-            formattedValue: finalMinusValue,
-          })
+        // Check if rawInputValue is just a minus sign (not a number with minus)
+        const isJustMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー'
+        if (isJustMinus) {
+          // Convert any full-width minus to half-width
+          const finalMinusValue = '-'
+          if (rawInputValue !== finalMinusValue) {
+            setRawInputValue(finalMinusValue)
+            onValueChange({
+              value: 0,
+              formattedValue: finalMinusValue,
+            })
+          }
         }
+        // If rawInputValue has numbers (e.g., "-123"), handleValueChange already processed it correctly
       }
 
       // Reset the flag
@@ -592,6 +589,7 @@ function NumericInput({
         : Number(value)
 
     // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", "-", "－", or "ー"
+    // Also preserve negative numbers when allowNegative is true (user might be typing)
     // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
     if (numValue === 0) {
       const isSingleZero =
@@ -602,6 +600,17 @@ function NumericInput({
         rawInputValue === 'ー' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
+      
+      // Check if rawInputValue is a negative number (preserve it when allowNegative is true)
+      if (allowNegative && rawInputValue !== '') {
+        const convertedRawValue = convertFullWidthToHalfWidth(rawInputValue)
+        const rawAsNumber = Number(convertedRawValue)
+        // If it's a valid negative number, preserve it
+        if (!Number.isNaN(rawAsNumber) && Number.isFinite(rawAsNumber) && rawAsNumber < 0) {
+          return
+        }
+      }
+      
       if (!isSingleZero) {
         // If value prop is 0 from outside, we should display "0"
         // Set rawInputValue to "0" so it can be displayed
@@ -612,6 +621,7 @@ function NumericInput({
 
     // For non-zero values, check if the numeric value matches what we'd get from rawInputValue
     // But preserve intermediate states like "-", "－", or "ー" (minus sign only)
+    // Also preserve negative numbers that start with minus sign when allowNegative is true
     if (rawInputValue !== '') {
       // Preserve minus sign only if allowNegative is true (half-width, full-width, and katakana)
       if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')) {
@@ -622,9 +632,31 @@ function NumericInput({
       // Convert to half-width for number comparison
       const convertedRawValue = convertFullWidthToHalfWidth(rawInputValue)
       const rawAsNumber = Number(convertedRawValue)
-      if (rawAsNumber !== numValue) {
-        // Value changed externally, clear rawInputValue
-        setRawInputValue('')
+      
+      // If rawInputValue starts with minus and allowNegative is true, preserve it
+      // This handles cases where user is typing negative numbers and value prop might not match yet
+      if (allowNegative && convertedRawValue.startsWith('-')) {
+        // Always preserve negative numbers when allowNegative is true
+        // Only clear if value prop is a positive number that clearly doesn't match
+        // (e.g., rawInputValue is "-123" but numValue is 123 - signs differ)
+        if (rawAsNumber === numValue) {
+          // They match, keep rawInputValue
+          return
+        } else if (numValue > 0 && Math.abs(rawAsNumber) === numValue) {
+          // Value prop is positive but rawInputValue is negative with same absolute value
+          // This means parent explicitly set a positive value, so clear rawInputValue
+          setRawInputValue('')
+        } else {
+          // In all other cases (numValue is 0, negative, or doesn't match), preserve rawInputValue
+          // This ensures user's typing is not lost
+          return
+        }
+      } else {
+        // For non-negative values, check if they match
+        if (rawAsNumber !== numValue) {
+          // Value changed externally, clear rawInputValue
+          setRawInputValue('')
+        }
       }
     }
   }, [value, separator, rawInputValue, allowNegative])
