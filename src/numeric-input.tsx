@@ -177,6 +177,7 @@ function NumericInput({
       // Don't convert full-width to half-width yet - wait for composition end
       if (!skipCompositionCheck && isComposing.current) {
         setComposingValue(inputValue)
+        // Store raw input value (could be full-width) for later processing
         setRawInputValue(inputValue)
         // Still notify parent but don't process the value
         onValueChange({
@@ -223,7 +224,7 @@ function NumericInput({
         return
       }
 
-      // Handle only minus sign: preserve it if allowNegative is true
+      // Handle only minus sign (half-width or full-width converted): preserve it if allowNegative is true
       if (rawValue === '-') {
         if (allowNegative) {
           setRawInputValue('-')
@@ -418,9 +419,12 @@ function NumericInput({
       }
 
       // Process the value after composition ends
+      // Convert full-width to half-width and preserve minus sign if needed
       // Use requestAnimationFrame to ensure it happens after any pending onChange events
       requestAnimationFrame(() => {
-        handleValueChange(finalValue, true)
+        // Convert full-width to half-width before processing
+        const convertedValue = convertFullWidthToHalfWidth(finalValue)
+        handleValueChange(convertedValue, true)
         // Reset flag after processing
         hasProcessedComposition.current = false
       })
@@ -431,7 +435,8 @@ function NumericInput({
   const handleBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
       // Check if we need to preserve minus sign before processing
-      const shouldPreserveMinus = allowNegative && rawInputValue === '-'
+      // Check both half-width and full-width minus
+      const shouldPreserveMinus = allowNegative && (rawInputValue === '-' || rawInputValue === '－')
       
       // If still composing when blur happens, force end composition
       if (isComposing.current) {
@@ -439,29 +444,38 @@ function NumericInput({
         const finalValue = e.target.value
         setComposingValue('')
         hasProcessedComposition.current = true
+        // Convert full-width to half-width before processing
+        const convertedValue = convertFullWidthToHalfWidth(finalValue)
         // Process the value immediately
-        handleValueChange(finalValue, true)
+        handleValueChange(convertedValue, true)
       } else if (composingValue !== '') {
         // If there's a composing value but not composing, process it
-        handleValueChange(composingValue, true)
+        // Convert full-width to half-width before processing
+        const convertedValue = convertFullWidthToHalfWidth(composingValue)
+        handleValueChange(convertedValue, true)
         setComposingValue('')
       } else if (!hasProcessedComposition.current && e.target.value) {
         // If we haven't processed composition and there's a value, process it
-        // But skip if we need to preserve minus sign and the value is not '-'
-        if (!shouldPreserveMinus || e.target.value === '-' || e.target.value === '－') {
-          handleValueChange(e.target.value, true)
+        // Convert full-width to half-width before processing
+        const convertedValue = convertFullWidthToHalfWidth(e.target.value)
+        // But skip if we need to preserve minus sign and the converted value is not '-'
+        if (!shouldPreserveMinus || convertedValue === '-') {
+          handleValueChange(convertedValue, true)
         }
       }
 
       // Apply min/max validation on blur for any intermediate values
       // This ensures values are clamped even if user was typing an out-of-range value
-      // But preserve intermediate states like "-" (minus sign only)
+      // But preserve intermediate states like "-" (minus sign only, half-width or full-width)
       if (rawInputValue !== '') {
         // Preserve minus sign only if allowNegative is true - skip clamp validation
-        const isMinusOnly = allowNegative && rawInputValue === '-'
+        // Check both half-width and full-width minus
+        const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－')
         
         if (!isMinusOnly) {
-          const numValue = Number(rawInputValue)
+          // Convert to half-width for number conversion
+          const convertedValue = convertFullWidthToHalfWidth(rawInputValue)
+          const numValue = Number(convertedValue)
           if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
             let clampedValue = numValue
             let shouldUpdate = false
@@ -487,7 +501,7 @@ function NumericInput({
         }
       }
       
-      // If we need to preserve minus sign, ensure it's still set
+      // If we need to preserve minus sign, ensure it's still set as half-width
       if (shouldPreserveMinus && rawInputValue !== '-') {
         setRawInputValue('-')
         onValueChange({

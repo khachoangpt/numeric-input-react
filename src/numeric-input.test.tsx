@@ -601,6 +601,67 @@ describe('NumericInput', () => {
         })
       })
     })
+
+    it('should handle full-width minus sign and continue typing numbers in Japanese', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      
+      // Simulate IME composition with full-width minus
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '－' } })
+      
+      // End composition - convert to half-width
+      fireEvent.compositionEnd(input, {
+        data: '－',
+      } as CompositionEvent)
+
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+
+      // Continue typing full-width numbers
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '－１２３' } })
+      fireEvent.compositionEnd(input, {
+        data: '－１２３',
+      } as CompositionEvent)
+
+      // Should convert to half-width and preserve minus sign
+      await waitFor(() => {
+        expect(input).toHaveValue('-123')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: -123,
+          formattedValue: '-123',
+        })
+      })
+    })
+
+    it('should preserve full-width minus after blur during IME composition', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      
+      // Simulate IME composition with full-width minus
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '－' } })
+      
+      // Blur during composition - should convert to half-width and preserve
+      fireEvent.blur(input)
+
+      // Minus sign should be preserved and converted to half-width after blur
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+    })
   })
 
   describe('Empty and edge cases', () => {
