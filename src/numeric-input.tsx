@@ -51,6 +51,55 @@ const escapeRegex = (str: string): string => {
 }
 
 /**
+ * Checks if a string is a minus sign (half-width, full-width, katakana, or mathematical)
+ */
+const isMinusSign = (str: string): boolean => {
+  return str === '-' || str === '－' || str === 'ー' || str === '−'
+}
+
+/**
+ * Converts any minus sign variant to half-width minus
+ */
+const normalizeMinusSign = (str: string): string => {
+  return isMinusSign(str) ? '-' : str
+}
+
+/**
+ * Parses a value prop (string or number) to a number, removing separator if present
+ */
+const parseValueProp = (
+  value: string | number | readonly string[] | null | undefined,
+  separator?: string,
+): number => {
+  if (value === null || value === undefined || value === '') {
+    return NaN
+  }
+
+  if (typeof value === 'number') {
+    return value
+  }
+
+  // Handle array case (shouldn't happen for numeric input, but handle gracefully)
+  if (Array.isArray(value)) {
+    const firstValue = value[0]
+    if (!firstValue) {
+      return NaN
+    }
+    const cleanedValue = separator
+      ? firstValue.replace(new RegExp(`[${escapeRegex(separator)}]`, 'g'), '')
+      : firstValue
+    return Number(cleanedValue)
+  }
+
+  // At this point, value must be a string
+  const cleanedValue = separator
+    ? (value as string).replace(new RegExp(`[${escapeRegex(separator)}]`, 'g'), '')
+    : (value as string)
+
+  return Number(cleanedValue)
+}
+
+/**
  * Normalizes the input string by removing invalid characters
  * and ensuring proper decimal point handling
  */
@@ -277,8 +326,6 @@ function NumericInput({
       }
 
       // Remove leading zeros except for single "0" or "0." patterns
-      // Only allow "0", "-0", "0.", "-0." to keep leading zero
-      // For cases like "01", "0123", "09999", "00.1" → remove leading zeros
       const shouldKeepSingleZero =
         rawValue === '0' ||
         rawValue === '-0' ||
@@ -286,43 +333,25 @@ function NumericInput({
         rawValue === '-0.'
 
       if (!shouldKeepSingleZero) {
-        // Remove leading zeros (but keep the minus sign if present)
-        if (rawValue.startsWith('-')) {
-          const withoutMinus = rawValue.slice(1)
-          // Split by decimal point to handle cases like "00.1"
-          if (withoutMinus.includes('.')) {
-            const [integerPart, decimalPart] = withoutMinus.split('.')
-            const cleanedInteger = integerPart.replace(/^0+/, '')
-            // If cleanedInteger is empty and there's a decimal part, keep "0"
-            if (cleanedInteger === '' && decimalPart) {
-              rawValue = `-0.${decimalPart}`
-            } else if (cleanedInteger === '') {
-              rawValue = '-0'
-            } else {
-              rawValue = `-${cleanedInteger}.${decimalPart}`
-            }
+        const hasMinus = rawValue.startsWith('-')
+        const withoutMinus = hasMinus ? rawValue.slice(1) : rawValue
+        const hasDecimal = withoutMinus.includes('.')
+
+        if (hasDecimal) {
+          const [integerPart, decimalPart] = withoutMinus.split('.')
+          const cleanedInteger = integerPart.replace(/^0+/, '')
+          const prefix = hasMinus ? '-' : ''
+          if (cleanedInteger === '' && decimalPart) {
+            rawValue = `${prefix}0.${decimalPart}`
+          } else if (cleanedInteger === '') {
+            rawValue = `${prefix}0`
           } else {
-            const withoutLeadingZeros = withoutMinus.replace(/^0+/, '')
-            rawValue =
-              withoutLeadingZeros === '' ? '-0' : `-${withoutLeadingZeros}`
+            rawValue = `${prefix}${cleanedInteger}.${decimalPart}`
           }
         } else {
-          // Split by decimal point to handle cases like "00.1"
-          if (rawValue.includes('.')) {
-            const [integerPart, decimalPart] = rawValue.split('.')
-            const cleanedInteger = integerPart.replace(/^0+/, '')
-            // If cleanedInteger is empty and there's a decimal part, keep "0"
-            if (cleanedInteger === '' && decimalPart) {
-              rawValue = `0.${decimalPart}`
-            } else if (cleanedInteger === '') {
-              rawValue = '0'
-            } else {
-              rawValue = `${cleanedInteger}.${decimalPart}`
-            }
-          } else {
-            const cleaned = rawValue.replace(/^0+/, '')
-            rawValue = cleaned === '' ? '0' : cleaned
-          }
+          const cleaned = withoutMinus.replace(/^0+/, '')
+          const prefix = hasMinus ? '-' : ''
+          rawValue = cleaned === '' ? `${prefix}0` : `${prefix}${cleaned}`
         }
       }
 
@@ -436,351 +465,232 @@ function NumericInput({
     [onCompositionStart],
   )
 
+  // Helper to process value after conversion (used in composition end and blur)
+  const processConvertedValue = useCallback(
+    (convertedValue: string) => {
+      if (allowNegative && convertedValue === '-') {
+        setRawInputValue('-')
+        onValueChange({
+          value: 0,
+          formattedValue: '-',
+        })
+      } else {
+        handleValueChange(convertedValue, true)
+      }
+    },
+    [allowNegative, handleValueChange, onValueChange],
+  )
+
   const handleCompositionEnd = useCallback(
     (e: CompositionEvent<HTMLInputElement>) => {
       isComposing.current = false
       const finalValue = e.currentTarget.value
-      // Clear the composing value
       setComposingValue('')
-      // Mark that we've processed composition to prevent duplicate processing in onChange
       hasProcessedComposition.current = true
 
-      // Handle custom onCompositionEnd
       if (onCompositionEnd) {
         onCompositionEnd(e)
       }
 
-      // Process the value after composition ends
-      // Convert full-width to half-width and preserve minus sign if needed
-      // Use requestAnimationFrame to ensure it happens after any pending onChange events
       requestAnimationFrame(() => {
-        // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(finalValue)
-        
-        // If the converted value is just a minus sign, preserve it
-        if (allowNegative && convertedValue === '-') {
-          setRawInputValue('-')
-          onValueChange({
-            value: 0,
-            formattedValue: '-',
-          })
-        } else {
-          // Process normally
-          handleValueChange(convertedValue, true)
-        }
-        
-        // Reset flag after processing
+        processConvertedValue(convertedValue)
         hasProcessedComposition.current = false
       })
     },
-    [onCompositionEnd, handleValueChange, allowNegative],
+    [onCompositionEnd, processConvertedValue],
   )
 
   const handleBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
-      // Check if we need to preserve minus sign before processing
-      // Check both half-width and full-width minus in rawInputValue and e.target.value
-      // Also check katakana long vowel mark (ー) and mathematical minus sign (−) which can be used as minus
       const currentValue = e.target.value
-      const isCurrentValueMinus = currentValue === '-' || currentValue === '－' || currentValue === 'ー' || currentValue === '−'
-      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−'
-      const shouldPreserveMinus = allowNegative && (isRawInputMinus || isCurrentValueMinus)
-      
-      // If still composing when blur happens, force end composition
+      const shouldPreserveMinus =
+        allowNegative && (isMinusSign(rawInputValue) || isMinusSign(currentValue))
+
+      // Handle composition states
       if (isComposing.current) {
         isComposing.current = false
-        const finalValue = e.target.value
+        const convertedValue = convertFullWidthToHalfWidth(e.target.value)
         setComposingValue('')
         hasProcessedComposition.current = true
-        // Convert full-width to half-width before processing
-        const convertedValue = convertFullWidthToHalfWidth(finalValue)
-        // If the converted value is just a minus sign, preserve it
-        if (allowNegative && convertedValue === '-') {
-          setRawInputValue('-')
-          onValueChange({
-            value: 0,
-            formattedValue: '-',
-          })
-        } else {
-          // Process the value immediately
-          handleValueChange(convertedValue, true)
-        }
+        processConvertedValue(convertedValue)
       } else if (composingValue !== '') {
-        // If there's a composing value but not composing, process it
-        // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(composingValue)
-        // If the converted value is just a minus sign, preserve it
-        if (allowNegative && convertedValue === '-') {
-          setRawInputValue('-')
-          onValueChange({
-            value: 0,
-            formattedValue: '-',
-          })
-        } else {
-          handleValueChange(convertedValue, true)
-        }
+        processConvertedValue(convertedValue)
         setComposingValue('')
       } else if (!hasProcessedComposition.current && e.target.value) {
-        // If we haven't processed composition and there's a value, process it
-        // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(e.target.value)
-        // Process the value - handleValueChange will preserve minus sign if present
         handleValueChange(convertedValue, true)
       }
 
-      // Apply min/max validation on blur for any intermediate values
-      // This ensures values are clamped even if user was typing an out-of-range value
-      // But preserve intermediate states like "-" (minus sign only, half-width or full-width)
-      if (rawInputValue !== '') {
-        // Preserve minus sign only if allowNegative is true - skip clamp validation
-      // Check half-width, full-width minus, katakana long vowel mark (ー), and mathematical minus sign (−)
-      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')
-        
-        if (!isMinusOnly) {
-          // Convert to half-width for number conversion
-          const convertedValue = convertFullWidthToHalfWidth(rawInputValue)
-          const numValue = Number(convertedValue)
-          if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
-            let clampedValue = numValue
-            let shouldUpdate = false
+      // Apply min/max validation on blur
+      if (rawInputValue !== '' && !(allowNegative && isMinusSign(rawInputValue))) {
+        const convertedValue = convertFullWidthToHalfWidth(rawInputValue)
+        const numValue = Number(convertedValue)
+        if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+          let clampedValue = numValue
+          let shouldUpdate = false
 
-            if (minValue !== undefined && clampedValue < minValue) {
-              clampedValue = minValue
-              shouldUpdate = true
-            }
-            if (maxValue !== undefined && clampedValue > maxValue) {
-              clampedValue = maxValue
-              shouldUpdate = true
-            }
-
-            if (shouldUpdate) {
-              const clampedString = clampedValue.toString()
-              setRawInputValue(clampedString)
-              onValueChange({
-                value: clampedValue,
-                formattedValue: formatValue(clampedValue),
-              })
-            }
+          if (minValue !== undefined && clampedValue < minValue) {
+            clampedValue = minValue
+            shouldUpdate = true
           }
-        }
-      }
-      
-      // If we need to preserve minus sign (only when value is just minus, no numbers), ensure it's still set as half-width
-      // Check both current rawInputValue and the value from input element
-      // Only preserve if the value is just a minus sign, not if it has numbers (those are handled by handleValueChange)
-      if (shouldPreserveMinus) {
-        // Check if rawInputValue is just a minus sign (not a number with minus)
-        const isJustMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−'
-        if (isJustMinus) {
-          // Convert any full-width minus to half-width
-          const finalMinusValue = '-'
-          if (rawInputValue !== finalMinusValue) {
-            setRawInputValue(finalMinusValue)
+          if (maxValue !== undefined && clampedValue > maxValue) {
+            clampedValue = maxValue
+            shouldUpdate = true
+          }
+
+          if (shouldUpdate) {
+            const clampedString = clampedValue.toString()
+            setRawInputValue(clampedString)
             onValueChange({
-              value: 0,
-              formattedValue: finalMinusValue,
+              value: clampedValue,
+              formattedValue: formatValue(clampedValue),
             })
           }
         }
-        // If rawInputValue has numbers (e.g., "-123"), handleValueChange already processed it correctly
       }
 
-      // Reset the flag
+      // Normalize minus sign to half-width if needed
+      if (shouldPreserveMinus && isMinusSign(rawInputValue) && rawInputValue !== '-') {
+        setRawInputValue('-')
+        onValueChange({
+          value: 0,
+          formattedValue: '-',
+        })
+      }
+
       hasProcessedComposition.current = false
 
-      // Call custom onBlur if provided
       if (onBlur) {
         onBlur(e)
       }
     },
-    [composingValue, onBlur, handleValueChange, rawInputValue, minValue, maxValue, formatValue, allowNegative],
+    [
+      composingValue,
+      onBlur,
+      handleValueChange,
+      rawInputValue,
+      minValue,
+      maxValue,
+      formatValue,
+      allowNegative,
+      processConvertedValue,
+    ],
   )
 
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
   useEffect(() => {
-    if (value === null || value === undefined || value === '') {
-      // Preserve "-", "－", "ー", or "−" if allowNegative is true and user is typing negative number
-      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')) {
+    const numValue = parseValueProp(value, separator)
+
+    if (Number.isNaN(numValue)) {
+      // Preserve minus sign if allowNegative is true and user is typing
+      if (allowNegative && isMinusSign(rawInputValue)) {
         return
       }
       setRawInputValue('')
       return
     }
 
-    // Convert value to number if it's a string
-    // Escape separator for regex if it exists
-    const numValue =
-      typeof value === 'string'
-        ? Number(
-            value.replace(
-              new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
-              '',
-            ),
-          )
-        : Number(value)
-
-    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", "-", "－", "ー", or "−"
-    // Also preserve negative numbers when allowNegative is true (user might be typing)
-    // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
+    // If the value is 0, preserve rawInputValue if it's a special pattern
     if (numValue === 0) {
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
-        rawInputValue === '-' ||
-        rawInputValue === '－' ||
-        rawInputValue === 'ー' ||
-        rawInputValue === '−' ||
+        isMinusSign(rawInputValue) ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
-      
+
       // Check if rawInputValue is a negative number (preserve it when allowNegative is true)
       if (allowNegative && rawInputValue !== '') {
         const convertedRawValue = convertFullWidthToHalfWidth(rawInputValue)
         const rawAsNumber = Number(convertedRawValue)
-        // If it's a valid negative number, preserve it
-        if (!Number.isNaN(rawAsNumber) && Number.isFinite(rawAsNumber) && rawAsNumber < 0) {
+        if (
+          !Number.isNaN(rawAsNumber) &&
+          Number.isFinite(rawAsNumber) &&
+          rawAsNumber < 0
+        ) {
           return
         }
       }
-      
+
       if (!isSingleZero) {
-        // If value prop is 0 from outside, we should display "0"
-        // Set rawInputValue to "0" so it can be displayed
         setRawInputValue('0')
       }
       return
     }
 
     // For non-zero values, check if the numeric value matches what we'd get from rawInputValue
-    // But preserve intermediate states like "-", "－", or "ー" (minus sign only)
-    // Also preserve negative numbers that start with minus sign when allowNegative is true
     if (rawInputValue !== '') {
-      // Preserve minus sign only if allowNegative is true (half-width, full-width, katakana, and mathematical minus)
-      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')) {
-        // Don't clear rawInputValue if it's just a minus sign
+      // Preserve minus sign only if allowNegative is true
+      if (allowNegative && isMinusSign(rawInputValue)) {
         return
       }
-      
-      // Convert to half-width for number comparison
+
       const convertedRawValue = convertFullWidthToHalfWidth(rawInputValue)
       const rawAsNumber = Number(convertedRawValue)
-      
-      // If rawInputValue starts with minus and allowNegative is true, preserve it
-      // This handles cases where user is typing negative numbers and value prop might not match yet
+
       if (allowNegative && convertedRawValue.startsWith('-')) {
-        // Always preserve negative numbers when allowNegative is true
-        // Only clear if value prop is a positive number that clearly doesn't match
-        // (e.g., rawInputValue is "-123" but numValue is 123 - signs differ)
         if (rawAsNumber === numValue) {
-          // They match, keep rawInputValue
           return
         } else if (numValue > 0 && Math.abs(rawAsNumber) === numValue) {
-          // Value prop is positive but rawInputValue is negative with same absolute value
-          // This means parent explicitly set a positive value, so clear rawInputValue
           setRawInputValue('')
         } else {
-          // In all other cases (numValue is 0, negative, or doesn't match), preserve rawInputValue
-          // This ensures user's typing is not lost
           return
         }
-      } else {
-        // For non-negative values, check if they match
-        if (rawAsNumber !== numValue) {
-          // Value changed externally, clear rawInputValue
-          setRawInputValue('')
-        }
+      } else if (rawAsNumber !== numValue) {
+        setRawInputValue('')
       }
     }
   }, [value, separator, rawInputValue, allowNegative])
 
   // Format the display value
   const displayValue = useMemo(() => {
-    // If currently composing, use the composing value (this allows IME input to display)
     if (composingValue !== '') {
       return composingValue
     }
 
-    // If rawInputValue is empty, check if we should display the value prop
-    // This handles both: value prop from outside, and user deleting content
     if (rawInputValue === '') {
-      if (value === null || value === undefined || value === '') {
+      const numValue = parseValueProp(value, separator)
+      if (Number.isNaN(numValue)) {
         return ''
       }
-      // Convert value to number if it's a string
-      // Escape separator for regex if it exists
-      const numValue =
-        typeof value === 'string'
-          ? Number(
-              value.replace(
-                new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
-                '',
-              ),
-            )
-          : Number(value)
-      // If value is 0 and rawInputValue is empty, show "0" (value prop from outside)
-      // This allows displaying 0 when it's passed as a prop
-      // Note: If user deletes content, onValueChange is called with formattedValue: '',
-      // and parent should update value prop to null/undefined/'' to hide "0"
       if (numValue === 0) {
         return '0'
       }
-      // For non-zero values, format and display them
-      if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+      if (Number.isFinite(numValue)) {
         return formatValue(numValue)
       }
       return ''
     }
 
-    // If we have a raw input value with single zero, minus sign only, or ending with decimal point, use it for display
     if (rawInputValue !== '') {
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
-      // Check half-width, full-width minus, katakana long vowel mark (ー), and mathematical minus sign (−)
-      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−')
+      const isMinusOnly = allowNegative && isMinusSign(rawInputValue)
       const endsWithDecimalPoint =
         allowDecimal &&
         rawInputValue.endsWith('.') &&
         !rawInputValue.endsWith('..')
+
       if (isSingleZero || isMinusOnly || endsWithDecimalPoint) {
-        // If it's full-width minus, katakana long vowel mark, or mathematical minus sign, convert to half-width for display
-        if (rawInputValue === '－' || rawInputValue === 'ー' || rawInputValue === '−') {
-          return '-'
-        }
-        return rawInputValue
+        return normalizeMinusSign(rawInputValue)
       }
-      
-      // If rawInputValue is not empty and doesn't match special cases, use it to calculate display value
-      // This handles the case where user is typing but value prop hasn't been updated yet
+
       const rawAsNumber = Number(rawInputValue)
       if (!Number.isNaN(rawAsNumber) && Number.isFinite(rawAsNumber)) {
         return formatValue(rawAsNumber)
       }
     }
 
-    if (value === null || value === undefined || value === '') {
+    const numValue = parseValueProp(value, separator)
+    if (Number.isNaN(numValue) || !Number.isFinite(numValue)) {
       return ''
     }
 
-    // Convert value to number if it's a string
-    // Escape separator for regex if it exists
-    const numValue =
-      typeof value === 'string'
-        ? Number(
-            value.replace(
-              new RegExp(`[${separator ? escapeRegex(separator) : ''}]`, 'g'),
-              '',
-            ),
-          )
-        : Number(value)
-
-    if (Number.isNaN(numValue)) {
-      return ''
-    }
-
-    // Format and return the value
     return formatValue(numValue)
   }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal])
 
