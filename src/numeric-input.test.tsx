@@ -639,6 +639,61 @@ describe('NumericInput', () => {
       expect(input).toHaveValue('-')
     })
 
+    it('should preserve minus sign after blur', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Type minus sign
+      fireEvent.change(input, { target: { value: '-' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Blur the input
+      fireEvent.blur(input)
+
+      // Minus sign should still be displayed after blur
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+    })
+
+    it('should preserve minus sign after pressing Enter', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Type minus sign
+      fireEvent.change(input, { target: { value: '-' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Press Enter (which triggers blur)
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+      fireEvent.blur(input)
+
+      // Minus sign should still be displayed after Enter
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+    })
+
     it('should preserve minus sign when value prop is updated to 0', async () => {
       const { rerender } = render(
         <NumericInput onValueChange={onValueChange} allowNegative={true} />,

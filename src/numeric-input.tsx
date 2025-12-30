@@ -430,6 +430,9 @@ function NumericInput({
 
   const handleBlur = useCallback(
     (e: FocusEvent<HTMLInputElement>) => {
+      // Check if we need to preserve minus sign before processing
+      const shouldPreserveMinus = allowNegative && rawInputValue === '-'
+      
       // If still composing when blur happens, force end composition
       if (isComposing.current) {
         isComposing.current = false
@@ -444,7 +447,10 @@ function NumericInput({
         setComposingValue('')
       } else if (!hasProcessedComposition.current && e.target.value) {
         // If we haven't processed composition and there's a value, process it
-        handleValueChange(e.target.value, true)
+        // But skip if we need to preserve minus sign and the value is not '-'
+        if (!shouldPreserveMinus || e.target.value === '-' || e.target.value === '－') {
+          handleValueChange(e.target.value, true)
+        }
       }
 
       // Apply min/max validation on blur for any intermediate values
@@ -480,6 +486,15 @@ function NumericInput({
           }
         }
       }
+      
+      // If we need to preserve minus sign, ensure it's still set
+      if (shouldPreserveMinus && rawInputValue !== '-') {
+        setRawInputValue('-')
+        onValueChange({
+          value: 0,
+          formattedValue: '-',
+        })
+      }
 
       // Reset the flag
       hasProcessedComposition.current = false
@@ -489,7 +504,7 @@ function NumericInput({
         onBlur(e)
       }
     },
-    [composingValue, onBlur, handleValueChange, rawInputValue, minValue, maxValue, formatValue],
+    [composingValue, onBlur, handleValueChange, rawInputValue, minValue, maxValue, formatValue, allowNegative],
   )
 
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
