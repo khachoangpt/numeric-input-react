@@ -566,6 +566,37 @@ describe('NumericInput', () => {
         })
       })
     })
+
+    it('should convert full-width minus to half-width during IME composition', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      
+      // Simulate IME composition with full-width minus
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '－' } })
+      
+      // During composition, full-width minus should be converted to half-width for display
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // End composition
+      fireEvent.compositionEnd(input, {
+        data: '－',
+      } as CompositionEvent)
+
+      // Minus sign should still be half-width after composition ends
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+    })
   })
 
   describe('Empty and edge cases', () => {
