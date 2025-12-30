@@ -198,6 +198,33 @@ describe('NumericInput', () => {
         })
       })
     })
+
+    it('should allow typing minus sign first then numbers', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Type minus sign first
+      fireEvent.change(input, { target: { value: '-' } })
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Continue typing numbers
+      fireEvent.change(input, { target: { value: '-123' } })
+      await waitFor(() => {
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: -123,
+          formattedValue: '-123',
+        })
+      })
+    })
   })
 
   describe('Separator formatting', () => {
@@ -514,13 +541,36 @@ describe('NumericInput', () => {
 
       const input = screen.getByRole('textbox')
       await user.type(input, '-')
-      await user.clear(input)
+
+      await waitFor(() => {
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Verify the input displays the minus sign
+      expect(input).toHaveValue('-')
+    })
+
+    it('should not allow minus sign when allowNegative is false', async () => {
+      const user = userEvent.setup()
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={false} />,
+      )
+
+      const input = screen.getByRole('textbox')
       await user.type(input, '-')
 
-      expect(onValueChange).toHaveBeenLastCalledWith({
-        value: 0,
-        formattedValue: '',
+      await waitFor(() => {
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '',
+        })
       })
+
+      // Verify the input is empty (minus sign was removed)
+      expect(input).toHaveValue('')
     })
 
     it('should handle invalid characters', async () => {

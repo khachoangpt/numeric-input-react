@@ -213,13 +213,33 @@ function NumericInput({
       }
 
       // Handle empty input first (before processing leading zeros)
-      if (rawValue === '' || rawValue === '-') {
+      if (rawValue === '') {
         setRawInputValue('')
         onValueChange({
           value: 0,
           formattedValue: '',
         })
         return
+      }
+
+      // Handle only minus sign: preserve it if allowNegative is true
+      if (rawValue === '-') {
+        if (allowNegative) {
+          setRawInputValue('-')
+          onValueChange({
+            value: 0,
+            formattedValue: '-',
+          })
+          return
+        } else {
+          // If negative is not allowed, treat as empty
+          setRawInputValue('')
+          onValueChange({
+            value: 0,
+            formattedValue: '',
+          })
+          return
+        }
       }
 
       // Remove leading zeros except for single "0" or "0." patterns
@@ -468,6 +488,10 @@ function NumericInput({
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
   useEffect(() => {
     if (value === null || value === undefined || value === '') {
+      // Preserve "-" if allowNegative is true and user is typing negative number
+      if (allowNegative && rawInputValue === '-') {
+        return
+      }
       setRawInputValue('')
       return
     }
@@ -508,7 +532,7 @@ function NumericInput({
         setRawInputValue('')
       }
     }
-  }, [value, separator, rawInputValue])
+  }, [value, separator, rawInputValue, allowNegative])
 
   // Format the display value
   const displayValue = useMemo(() => {
@@ -548,19 +572,27 @@ function NumericInput({
       return ''
     }
 
-    // If we have a raw input value with single zero or ending with decimal point, use it for display
+    // If we have a raw input value with single zero, minus sign only, or ending with decimal point, use it for display
     if (rawInputValue !== '') {
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
+      const isMinusOnly = allowNegative && rawInputValue === '-'
       const endsWithDecimalPoint =
         allowDecimal &&
         rawInputValue.endsWith('.') &&
         !rawInputValue.endsWith('..')
-      if (isSingleZero || endsWithDecimalPoint) {
+      if (isSingleZero || isMinusOnly || endsWithDecimalPoint) {
         return rawInputValue
+      }
+      
+      // If rawInputValue is not empty and doesn't match special cases, use it to calculate display value
+      // This handles the case where user is typing but value prop hasn't been updated yet
+      const rawAsNumber = Number(rawInputValue)
+      if (!Number.isNaN(rawAsNumber) && Number.isFinite(rawAsNumber)) {
+        return formatValue(rawAsNumber)
       }
     }
 
@@ -586,7 +618,7 @@ function NumericInput({
 
     // Format and return the value
     return formatValue(numValue)
-  }, [value, formatValue, separator, composingValue, rawInputValue])
+  }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal])
 
   // Determine appropriate inputMode for mobile keyboards
   const inputMode = allowDecimal ? 'decimal' : 'numeric'
