@@ -174,15 +174,14 @@ function NumericInput({
   const handleValueChange = useCallback(
     (inputValue: string, skipCompositionCheck = false) => {
       // During IME composition, update the composing value for display
+      // Don't convert full-width to half-width yet - wait for composition end
       if (!skipCompositionCheck && isComposing.current) {
-        // Convert full-width Japanese characters to half-width even during composition
-        const convertedValue = convertFullWidthToHalfWidth(inputValue)
-        setComposingValue(convertedValue)
-        setRawInputValue(convertedValue)
+        setComposingValue(inputValue)
+        setRawInputValue(inputValue)
         // Still notify parent but don't process the value
         onValueChange({
           value: 0,
-          formattedValue: convertedValue,
+          formattedValue: inputValue,
         })
         return
       }
