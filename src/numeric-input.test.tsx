@@ -762,8 +762,8 @@ describe('NumericInput', () => {
 
       const input = screen.getByRole('textbox')
       
-      // Type full-width minus sign
-      fireEvent.change(input, { target: { value: '－' } })
+      // Type full-width minus sign (ー)
+      fireEvent.change(input, { target: { value: 'ー' } })
       
       await waitFor(() => {
         expect(input).toHaveValue('-')
@@ -778,6 +778,41 @@ describe('NumericInput', () => {
       fireEvent.blur(input)
 
       // Minus sign should still be displayed after Enter (converted to half-width)
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+    })
+
+    it('should preserve full-width minus (ー) after pressing Enter without composition', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Simulate typing full-width minus (ー) directly (not in composition)
+      // This simulates the case where user types ー and presses Enter immediately
+      fireEvent.change(input, { target: { value: 'ー' } })
+      
+      // The value should be converted to half-width
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Simulate pressing Enter - this should trigger blur
+      // The input value should already be converted to half-width from the change event
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+      fireEvent.blur(input)
+
+      // Minus sign should still be displayed after Enter (as half-width)
       await waitFor(() => {
         expect(input).toHaveValue('-')
         expect(onValueChange).toHaveBeenLastCalledWith({

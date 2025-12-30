@@ -39,6 +39,7 @@ const convertFullWidthToHalfWidth = (str: string): string => {
     .replace(/[．]/g, '.') // Convert full-width period (．) to half-width (.)
     .replace(/[，]/g, ',') // Convert full-width comma (，) to half-width (,)
     .replace(/[－]/g, '-') // Convert full-width minus (－) to half-width (-)
+    .replace(/[ー]/g, '-') // Convert katakana long vowel mark (ー) to minus (-) when used as minus
 }
 
 /**
@@ -448,9 +449,10 @@ function NumericInput({
     (e: FocusEvent<HTMLInputElement>) => {
       // Check if we need to preserve minus sign before processing
       // Check both half-width and full-width minus in rawInputValue and e.target.value
+      // Also check katakana long vowel mark (ー) which can be used as minus in Japanese
       const currentValue = e.target.value
-      const isCurrentValueMinus = currentValue === '-' || currentValue === '－'
-      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－'
+      const isCurrentValueMinus = currentValue === '-' || currentValue === '－' || currentValue === 'ー'
+      const isRawInputMinus = rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー'
       const shouldPreserveMinus = allowNegative && (isRawInputMinus || isCurrentValueMinus)
       
       // If still composing when blur happens, force end composition
@@ -509,8 +511,8 @@ function NumericInput({
       // But preserve intermediate states like "-" (minus sign only, half-width or full-width)
       if (rawInputValue !== '') {
         // Preserve minus sign only if allowNegative is true - skip clamp validation
-        // Check both half-width and full-width minus
-        const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－')
+      // Check half-width, full-width minus, and katakana long vowel mark (ー)
+      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')
         
         if (!isMinusOnly) {
           // Convert to half-width for number conversion
@@ -569,8 +571,8 @@ function NumericInput({
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
   useEffect(() => {
     if (value === null || value === undefined || value === '') {
-      // Preserve "-" if allowNegative is true and user is typing negative number
-      if (allowNegative && rawInputValue === '-') {
+      // Preserve "-", "－", or "ー" if allowNegative is true and user is typing negative number
+      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')) {
         return
       }
       setRawInputValue('')
@@ -589,13 +591,15 @@ function NumericInput({
           )
         : Number(value)
 
-    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", or "-"
+    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", "-", "－", or "ー"
     // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
     if (numValue === 0) {
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
         rawInputValue === '-' ||
+        rawInputValue === '－' ||
+        rawInputValue === 'ー' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
       if (!isSingleZero) {
@@ -607,15 +611,17 @@ function NumericInput({
     }
 
     // For non-zero values, check if the numeric value matches what we'd get from rawInputValue
-    // But preserve intermediate states like "-" (minus sign only)
+    // But preserve intermediate states like "-", "－", or "ー" (minus sign only)
     if (rawInputValue !== '') {
-      // Preserve minus sign only if allowNegative is true
-      if (allowNegative && rawInputValue === '-') {
+      // Preserve minus sign only if allowNegative is true (half-width, full-width, and katakana)
+      if (allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')) {
         // Don't clear rawInputValue if it's just a minus sign
         return
       }
       
-      const rawAsNumber = Number(rawInputValue)
+      // Convert to half-width for number comparison
+      const convertedRawValue = convertFullWidthToHalfWidth(rawInputValue)
+      const rawAsNumber = Number(convertedRawValue)
       if (rawAsNumber !== numValue) {
         // Value changed externally, clear rawInputValue
         setRawInputValue('')
@@ -668,12 +674,17 @@ function NumericInput({
         rawInputValue === '-0' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
-      const isMinusOnly = allowNegative && rawInputValue === '-'
+      // Check half-width, full-width minus, and katakana long vowel mark (ー)
+      const isMinusOnly = allowNegative && (rawInputValue === '-' || rawInputValue === '－' || rawInputValue === 'ー')
       const endsWithDecimalPoint =
         allowDecimal &&
         rawInputValue.endsWith('.') &&
         !rawInputValue.endsWith('..')
       if (isSingleZero || isMinusOnly || endsWithDecimalPoint) {
+        // If it's full-width minus or katakana long vowel mark, convert to half-width for display
+        if (rawInputValue === '－' || rawInputValue === 'ー') {
+          return '-'
+        }
         return rawInputValue
       }
       
