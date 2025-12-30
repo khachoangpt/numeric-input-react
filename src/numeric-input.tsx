@@ -448,28 +448,34 @@ function NumericInput({
 
       // Apply min/max validation on blur for any intermediate values
       // This ensures values are clamped even if user was typing an out-of-range value
+      // But preserve intermediate states like "-" (minus sign only)
       if (rawInputValue !== '') {
-        const numValue = Number(rawInputValue)
-        if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
-          let clampedValue = numValue
-          let shouldUpdate = false
+        // Preserve minus sign only if allowNegative is true - skip clamp validation
+        const isMinusOnly = allowNegative && rawInputValue === '-'
+        
+        if (!isMinusOnly) {
+          const numValue = Number(rawInputValue)
+          if (!Number.isNaN(numValue) && Number.isFinite(numValue)) {
+            let clampedValue = numValue
+            let shouldUpdate = false
 
-          if (minValue !== undefined && clampedValue < minValue) {
-            clampedValue = minValue
-            shouldUpdate = true
-          }
-          if (maxValue !== undefined && clampedValue > maxValue) {
-            clampedValue = maxValue
-            shouldUpdate = true
-          }
+            if (minValue !== undefined && clampedValue < minValue) {
+              clampedValue = minValue
+              shouldUpdate = true
+            }
+            if (maxValue !== undefined && clampedValue > maxValue) {
+              clampedValue = maxValue
+              shouldUpdate = true
+            }
 
-          if (shouldUpdate) {
-            const clampedString = clampedValue.toString()
-            setRawInputValue(clampedString)
-            onValueChange({
-              value: clampedValue,
-              formattedValue: formatValue(clampedValue),
-            })
+            if (shouldUpdate) {
+              const clampedString = clampedValue.toString()
+              setRawInputValue(clampedString)
+              onValueChange({
+                value: clampedValue,
+                formattedValue: formatValue(clampedValue),
+              })
+            }
           }
         }
       }
@@ -508,12 +514,13 @@ function NumericInput({
           )
         : Number(value)
 
-    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", or "-0."
+    // If the value is 0, preserve rawInputValue if it's "0", "-0", "0.", "-0.", or "-"
     // Otherwise, if value prop is 0 (controlled from outside), set rawInputValue to "0" to display it
     if (numValue === 0) {
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
+        rawInputValue === '-' ||
         rawInputValue.startsWith('0.') ||
         rawInputValue.startsWith('-0.')
       if (!isSingleZero) {

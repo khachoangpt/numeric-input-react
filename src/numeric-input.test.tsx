@@ -515,6 +515,57 @@ describe('NumericInput', () => {
         })
       })
     })
+
+    it('should preserve full-width minus sign after blur', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // Simulate typing full-width minus sign only: －
+      fireEvent.change(input, { target: { value: '－' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Blur the input
+      fireEvent.blur(input)
+
+      // Minus sign should still be displayed after blur
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+    })
+
+    it('should preserve full-width minus sign after blur during IME composition', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      
+      // Simulate IME composition with full-width minus
+      fireEvent.compositionStart(input)
+      fireEvent.change(input, { target: { value: '－' } })
+      
+      // Blur during composition - this should trigger handleValueChange which converts full-width to half-width
+      fireEvent.blur(input)
+
+      // Minus sign should be preserved and converted to half-width after blur
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+    })
   })
 
   describe('Empty and edge cases', () => {
@@ -551,6 +602,39 @@ describe('NumericInput', () => {
 
       // Verify the input displays the minus sign
       expect(input).toHaveValue('-')
+    })
+
+    it('should preserve minus sign when value prop is updated to 0', async () => {
+      const { rerender } = render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // User types minus sign
+      fireEvent.change(input, { target: { value: '-' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Parent component updates value prop to 0 (which is what onValueChange returned)
+      rerender(
+        <NumericInput 
+          onValueChange={onValueChange} 
+          allowNegative={true} 
+          value={0}
+        />,
+      )
+
+      // Minus sign should still be displayed (not disappear)
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
     })
 
     it('should not allow minus sign when allowNegative is false', async () => {
