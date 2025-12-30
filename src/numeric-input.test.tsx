@@ -637,6 +637,39 @@ describe('NumericInput', () => {
       })
     })
 
+    it('should preserve minus sign when value prop is updated to formattedValue "-"', async () => {
+      const { rerender } = render(
+        <NumericInput onValueChange={onValueChange} allowNegative={true} />,
+      )
+
+      const input = screen.getByRole('textbox')
+      
+      // User types minus sign
+      fireEvent.change(input, { target: { value: '-' } })
+      
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '-',
+        })
+      })
+
+      // Parent component updates value prop to formattedValue "-" (which is what onValueChange returned)
+      rerender(
+        <NumericInput 
+          onValueChange={onValueChange} 
+          allowNegative={true} 
+          value="-"
+        />,
+      )
+
+      // Minus sign should still be displayed (not disappear)
+      await waitFor(() => {
+        expect(input).toHaveValue('-')
+      })
+    })
+
     it('should not allow minus sign when allowNegative is false', async () => {
       const user = userEvent.setup()
       render(

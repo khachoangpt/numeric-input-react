@@ -532,7 +532,14 @@ function NumericInput({
     }
 
     // For non-zero values, check if the numeric value matches what we'd get from rawInputValue
+    // But preserve intermediate states like "-" (minus sign only)
     if (rawInputValue !== '') {
+      // Preserve minus sign only if allowNegative is true
+      if (allowNegative && rawInputValue === '-') {
+        // Don't clear rawInputValue if it's just a minus sign
+        return
+      }
+      
       const rawAsNumber = Number(rawInputValue)
       if (rawAsNumber !== numValue) {
         // Value changed externally, clear rawInputValue
