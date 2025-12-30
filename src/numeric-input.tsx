@@ -424,12 +424,24 @@ function NumericInput({
       requestAnimationFrame(() => {
         // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(finalValue)
-        handleValueChange(convertedValue, true)
+        
+        // If the converted value is just a minus sign, preserve it
+        if (allowNegative && convertedValue === '-') {
+          setRawInputValue('-')
+          onValueChange({
+            value: 0,
+            formattedValue: '-',
+          })
+        } else {
+          // Process normally
+          handleValueChange(convertedValue, true)
+        }
+        
         // Reset flag after processing
         hasProcessedComposition.current = false
       })
     },
-    [onCompositionEnd, handleValueChange],
+    [onCompositionEnd, handleValueChange, allowNegative],
   )
 
   const handleBlur = useCallback(
@@ -449,13 +461,31 @@ function NumericInput({
         hasProcessedComposition.current = true
         // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(finalValue)
-        // Process the value immediately
-        handleValueChange(convertedValue, true)
+        // If the converted value is just a minus sign, preserve it
+        if (allowNegative && convertedValue === '-') {
+          setRawInputValue('-')
+          onValueChange({
+            value: 0,
+            formattedValue: '-',
+          })
+        } else {
+          // Process the value immediately
+          handleValueChange(convertedValue, true)
+        }
       } else if (composingValue !== '') {
         // If there's a composing value but not composing, process it
         // Convert full-width to half-width before processing
         const convertedValue = convertFullWidthToHalfWidth(composingValue)
-        handleValueChange(convertedValue, true)
+        // If the converted value is just a minus sign, preserve it
+        if (allowNegative && convertedValue === '-') {
+          setRawInputValue('-')
+          onValueChange({
+            value: 0,
+            formattedValue: '-',
+          })
+        } else {
+          handleValueChange(convertedValue, true)
+        }
         setComposingValue('')
       } else if (!hasProcessedComposition.current && e.target.value) {
         // If we haven't processed composition and there's a value, process it
