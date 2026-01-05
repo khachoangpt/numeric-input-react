@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { NumericInput, type NumericInputValue } from './numeric-input'
+import { NumericInput } from './numeric-input'
+import type { NumericInputValue } from './numeric-input.types'
 
 describe('NumericInput', () => {
   let onValueChange: MockedFunction<(valueObject: NumericInputValue) => void>

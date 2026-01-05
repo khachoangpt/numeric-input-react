@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState, useCallback } from 'react'
-import { NumericInput, type NumericInputValue, type NumericInputProps } from './numeric-input'
+import { NumericInput } from './numeric-input'
+import type { NumericInputProps, NumericInputValue } from './numeric-input.types'
 
 // Wrapper component that maintains its own state
 const NumericInputWithState = (props: Omit<NumericInputProps, 'onValueChange'>) => {
