@@ -67,6 +67,11 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     value: 0,
     formattedValue: '',
   })
+  // Track previous value prop to detect external changes
+  // Initialize to undefined to detect first render
+  const prevValueRef = useRef<typeof value>(undefined)
+  // Track if user has actively cleared the input (to distinguish from initial empty state)
+  const [userCleared, setUserCleared] = useState(false)
   
   // Determine if we're in controlled or uncontrolled mode
   // Controlled: both value and onValueChange are provided
@@ -155,6 +160,8 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // Handle empty input first (before processing leading zeros)
       if (rawValue === '') {
         setRawInputValue('')
+        // Mark that user has actively cleared the input
+        setUserCleared(true)
         const valueObject = {
           value: 0,
           formattedValue: '',
@@ -166,6 +173,11 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           setInternalValue(valueObject)
         }
         return
+      }
+      
+      // Reset the cleared flag when user types something
+      if (userCleared && rawValue !== '') {
+        setUserCleared(false)
       }
 
       // Handle only minus sign (half-width or full-width converted): preserve it if allowNegative is true
@@ -504,6 +516,12 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     }
     
     const numValue = parseValueProp(value, separator)
+    const prevNumValue = parseValueProp(prevValueRef.current, separator)
+    const isFirstRender = prevValueRef.current === undefined
+    const valueChanged = !isFirstRender && value !== prevValueRef.current
+    // Check if value changed from non-zero to zero (external reset)
+    const changedToZero = !isFirstRender && prevNumValue !== 0 && numValue === 0
+    prevValueRef.current = value
 
     if (Number.isNaN(numValue)) {
       // Preserve minus sign if allowNegative is true and user is typing
@@ -515,7 +533,28 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     }
 
     // If the value is 0, preserve rawInputValue if it's a special pattern
+    // But if rawInputValue is empty and value prop didn't change externally, keep it empty
+    // This allows users to delete "0" and have an empty input
     if (numValue === 0) {
+      // On first render with value={0}, set rawInputValue to '0' to show "0"
+      if (isFirstRender && rawInputValue === '') {
+        setRawInputValue('0')
+        setUserCleared(false)
+        return
+      }
+
+      // If user has actively cleared the input (rawInputValue is empty and userCleared is true),
+      // preserve the empty state even if value prop is 0. This allows users to delete "0" and have an empty input.
+      // However, if value prop changed from non-zero to zero externally (external reset), we should show "0"
+      if (rawInputValue === '' && userCleared && !changedToZero) {
+        return
+      }
+      
+      // If value changed externally from non-zero to 0 (external reset), reset the cleared flag and show "0"
+      if (changedToZero && rawInputValue === '') {
+        setUserCleared(false)
+      }
+
       const isSingleZero =
         rawInputValue === '0' ||
         rawInputValue === '-0' ||
@@ -536,13 +575,26 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
         }
       }
 
+      // If value changed externally from non-zero to 0, or if rawInputValue doesn't match, set it to '0'
+      // But only if it's not already a special pattern
       if (!isSingleZero) {
-        setRawInputValue('0')
+        // If value changed externally from non-zero to 0, we should show "0"
+        // If value didn't change but rawInputValue is not empty and not a special pattern, set to '0'
+        if (changedToZero || (rawInputValue !== '' && !userCleared)) {
+          setRawInputValue('0')
+        }
       }
       return
     }
 
     // For non-zero values, check if the numeric value matches what we'd get from rawInputValue
+    // On first render with a non-zero value, set rawInputValue to empty so displayValue can format it
+    if (isFirstRender && rawInputValue === '') {
+      // On first render, we don't set rawInputValue here - let displayValue handle formatting
+      // This allows the formatted value to be displayed correctly
+      return
+    }
+    
     if (rawInputValue !== '') {
       // Preserve minus sign only if allowNegative is true
       if (allowNegative && isMinusSign(rawInputValue)) {
@@ -561,8 +613,15 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           return
         }
       } else if (rawAsNumber !== numValue) {
-        setRawInputValue('')
+        // If the numeric value doesn't match, clear rawInputValue to let displayValue format it
+        // But only if value changed externally (not from user typing)
+        if (valueChanged) {
+          setRawInputValue('')
+        }
       }
+    } else if (valueChanged) {
+      // If rawInputValue is empty and value changed externally, clear it to let displayValue format it
+      setRawInputValue('')
     }
   }, [value, separator, rawInputValue, allowNegative, isControlled])
 
@@ -578,12 +637,17 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     }
 
     if (rawInputValue === '') {
+      // When rawInputValue is empty, check if user has actively cleared it
+      // If user cleared it (userCleared is true), show empty string
+      // Otherwise, format the value prop (for initial render or external updates)
+      if (userCleared) {
+        return ''
+      }
+      
+      // Format the value prop for display (initial render or external update)
       const numValue = parseValueProp(value, separator)
       if (Number.isNaN(numValue)) {
         return ''
-      }
-      if (numValue === 0) {
-        return '0'
       }
       if (Number.isFinite(numValue)) {
         return formatValue(numValue)
@@ -619,7 +683,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     }
 
     return formatValue(numValue)
-  }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal, isControlled, internalValue])
+  }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal, isControlled, internalValue, userCleared])
 
   // Determine appropriate inputMode for mobile keyboards
   const inputMode: 'decimal' | 'numeric' = allowDecimal ? 'decimal' : 'numeric'
