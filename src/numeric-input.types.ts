@@ -6,7 +6,7 @@ export type NumericInputValue = {
 }
 
 export type NumericInputProps = ComponentProps<'input'> & {
-  onValueChange: (valueObject: NumericInputValue) => void
+  onValueChange?: (valueObject: NumericInputValue) => void
   separator?: string
   allowDecimal?: boolean
   allowNegative?: boolean

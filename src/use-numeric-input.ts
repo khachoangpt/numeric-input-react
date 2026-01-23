@@ -25,7 +25,7 @@ type UseNumericInputOptions = {
   maxValue?: number
   maxDecimalPlaces?: number
   maxLength?: number
-  onValueChange: (valueObject: NumericInputValue) => void
+  onValueChange?: (valueObject: NumericInputValue) => void
   onCompositionStart?: NumericInputProps['onCompositionStart']
   onCompositionEnd?: NumericInputProps['onCompositionEnd']
   onBlur?: NumericInputProps['onBlur']
@@ -62,6 +62,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
   const hasProcessedComposition = useRef(false)
   // Store the raw input string to preserve leading zeros
   const [rawInputValue, setRawInputValue] = useState<string>('')
+  // Internal state for uncontrolled mode
+  const [internalValue, setInternalValue] = useState<NumericInputValue>({
+    value: 0,
+    formattedValue: '',
+  })
+  
+  // Determine if we're in controlled or uncontrolled mode
+  // Controlled: both value and onValueChange are provided
+  // Uncontrolled: value is not provided (onValueChange may still be provided for callbacks)
+  const isControlled = value !== undefined
 
   const formatValue = useCallback(
     (numValue: number): string => {
@@ -102,10 +112,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
         // Store raw input value (could be full-width) for later processing
         setRawInputValue(inputValue)
         // Still notify parent but don't process the value
-        onValueChange({
+        const valueObject = {
           value: 0,
           formattedValue: inputValue,
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
         return
       }
 
@@ -139,10 +155,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // Handle empty input first (before processing leading zeros)
       if (rawValue === '') {
         setRawInputValue('')
-        onValueChange({
+        const valueObject = {
           value: 0,
           formattedValue: '',
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
         return
       }
 
@@ -150,18 +172,29 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       if (rawValue === '-') {
         if (allowNegative) {
           setRawInputValue('-')
-          onValueChange({
+          const valueObject = {
             value: 0,
             formattedValue: '-',
-          })
+          }
+          if (onValueChange) {
+            onValueChange(valueObject)
+          }
+          if (!isControlled) {
+            setInternalValue(valueObject)
+          }
           return
         } else {
           // If negative is not allowed, treat as empty
           setRawInputValue('')
-          onValueChange({
+          const valueObject = {
             value: 0,
             formattedValue: '',
-          })
+          }
+          if (isControlled && onValueChange) {
+            onValueChange(valueObject)
+          } else {
+            setInternalValue(valueObject)
+          }
           return
         }
       }
@@ -205,10 +238,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // Handle invalid numbers
       if (Number.isNaN(valueAsNumber) || !Number.isFinite(valueAsNumber)) {
         setRawInputValue('')
-        onValueChange({
+        const valueObject = {
           value: 0,
           formattedValue: '',
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
         return
       }
 
@@ -218,10 +257,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           valueAsNumber > 0 ? Number.MAX_SAFE_INTEGER : -Number.MAX_SAFE_INTEGER
         const clampedString = clampedValue.toString()
         setRawInputValue(clampedString)
-        onValueChange({
+        const valueObject = {
           value: clampedValue,
           formattedValue: formatValue(clampedValue),
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
         return
       }
 
@@ -265,18 +310,30 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // If it's a single zero pattern or ends with decimal point, use the raw value for display
       if (isSingleZero || endsWithDecimalPoint) {
         // Use the raw value as-is to preserve single "0" or trailing decimal point
-        onValueChange({
+        const valueObject = {
           value: finalValue,
           formattedValue: shouldClamp ? formatValue(finalValue) : rawValue,
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
         return
       }
 
       // Valid number without leading zeros - format and return
-      onValueChange({
+      const valueObject = {
         value: finalValue,
         formattedValue: formatValue(finalValue),
-      })
+      }
+      if (onValueChange) {
+        onValueChange(valueObject)
+      }
+      if (!isControlled) {
+        setInternalValue(valueObject)
+      }
     },
     [
       allowDecimal,
@@ -288,6 +345,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       minValue,
       maxValue,
       maxDecimalPlaces,
+      isControlled,
     ],
   )
 
@@ -311,10 +369,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     (convertedValue: string) => {
       if (allowNegative && convertedValue === '-') {
         setRawInputValue('-')
-        onValueChange({
+        const valueObject = {
           value: 0,
           formattedValue: '-',
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
       } else {
         handleValueChange(convertedValue, true)
       }
@@ -384,10 +448,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           if (shouldUpdate) {
             const clampedString = clampedValue.toString()
             setRawInputValue(clampedString)
-            onValueChange({
+            const valueObject = {
               value: clampedValue,
               formattedValue: formatValue(clampedValue),
-            })
+            }
+            if (onValueChange) {
+              onValueChange(valueObject)
+            }
+            if (!isControlled) {
+              setInternalValue(valueObject)
+            }
           }
         }
       }
@@ -395,10 +465,16 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // Normalize minus sign to half-width if needed
       if (shouldPreserveMinus && isMinusSign(rawInputValue) && rawInputValue !== '-') {
         setRawInputValue('-')
-        onValueChange({
+        const valueObject = {
           value: 0,
           formattedValue: '-',
-        })
+        }
+        if (onValueChange) {
+          onValueChange(valueObject)
+        }
+        if (!isControlled) {
+          setInternalValue(valueObject)
+        }
       }
 
       hasProcessedComposition.current = false
@@ -421,7 +497,12 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
   )
 
   // Reset rawInputValue when value prop changes externally (e.g., form reset)
+  // Only run this effect in controlled mode
   useEffect(() => {
+    if (!isControlled) {
+      return
+    }
+    
     const numValue = parseValueProp(value, separator)
 
     if (Number.isNaN(numValue)) {
@@ -483,12 +564,17 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
         setRawInputValue('')
       }
     }
-  }, [value, separator, rawInputValue, allowNegative])
+  }, [value, separator, rawInputValue, allowNegative, isControlled])
 
   // Format the display value
   const displayValue = useMemo(() => {
     if (composingValue !== '') {
       return composingValue
+    }
+
+    // Use internal value for uncontrolled mode
+    if (!isControlled && rawInputValue === '') {
+      return internalValue.formattedValue
     }
 
     if (rawInputValue === '') {
@@ -533,7 +619,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     }
 
     return formatValue(numValue)
-  }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal])
+  }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal, isControlled, internalValue])
 
   // Determine appropriate inputMode for mobile keyboards
   const inputMode: 'decimal' | 'numeric' = allowDecimal ? 'decimal' : 'numeric'

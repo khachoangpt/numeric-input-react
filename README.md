@@ -49,7 +49,7 @@ Extends all standard HTML input props (`ComponentProps<'input'>`) with the follo
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `onValueChange` | `(valueObject: NumericInputValue) => void` | **Required** | Callback function that receives the numeric value and formatted string |
+| `onValueChange` | `(valueObject: NumericInputValue) => void` | `undefined` | Callback function that receives the numeric value and formatted string |
 | `separator` | `string` | `undefined` | Thousands separator (e.g., `","` for comma, `" "` for space) |
 | `allowDecimal` | `boolean` | `false` | Whether to allow decimal point input |
 | `allowNegative` | `boolean` | `false` | Whether to allow negative numbers |

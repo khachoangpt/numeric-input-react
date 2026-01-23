@@ -168,3 +168,21 @@ export const WithAllInputProps: Story = {
   },
 }
 
+// Uncontrolled mode example - works without value and onValueChange
+export const Uncontrolled: Story = {
+  render: () => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '300px' }}>
+      <NumericInput
+        placeholder="Enter a number (uncontrolled)"
+        allowDecimal={true}
+        allowNegative={true}
+        separator=","
+      />
+      <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+        <div>This input works without value and onValueChange props</div>
+        <div>You can type numbers and it will handle all the logic internally</div>
+      </div>
+    </div>
+  ),
+}
+
