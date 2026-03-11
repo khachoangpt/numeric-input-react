@@ -163,3 +163,36 @@ export const normalizeNumericInput = (
   return normalized
 }
 
+/**
+ * Count digit characters (0-9) from the start of string up to (but not including) position.
+ * Used to preserve cursor position when reformatting (e.g. adding/removing thousand separators).
+ */
+export const countDigitsBefore = (str: string, position: number): number => {
+  const end = Math.min(position, str.length)
+  let count = 0
+  for (let i = 0; i < end; i++) {
+    if (/\d/.test(str[i] ?? '')) count++
+  }
+  return count
+}
+
+/**
+ * Find the position in the formatted string where the digit count from the start equals digitCount.
+ * Returns the position right after the digitCount-th digit (suitable for selectionStart).
+ * When digitCount is 0, returns 0 (cursor at start); never returns past-the-end for cursor placement.
+ */
+export const positionAfterDigitCount = (
+  str: string,
+  digitCount: number,
+): number => {
+  if (digitCount <= 0) return 0
+  let count = 0
+  for (let i = 0; i < str.length; i++) {
+    if (/\d/.test(str[i] ?? '')) {
+      count++
+      if (count === digitCount) return i + 1
+    }
+  }
+  return str.length
+}
+

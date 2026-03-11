@@ -59,7 +59,14 @@ const NumericInput = ({
         if (hasProcessedComposition.current) {
           return
         }
-        handleValueChange(e.target.value)
+        const target = e.target
+        handleValueChange(target.value, {
+          selectionContext: {
+            displayValue: target.value,
+            selectionStart: target.selectionStart ?? 0,
+            selectionEnd: target.selectionEnd ?? 0,
+          },
+        })
       }}
       {...props}
     />

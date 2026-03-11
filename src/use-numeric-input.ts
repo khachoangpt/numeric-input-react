@@ -9,10 +9,12 @@ import {
 } from 'react'
 import {
   convertFullWidthToHalfWidth,
+  countDigitsBefore,
   isMinusSign,
   normalizeMinusSign,
   normalizeNumericInput,
   parseValueProp,
+  positionAfterDigitCount,
 } from './numeric-input.utils'
 import type { NumericInputValue, NumericInputProps } from './numeric-input.types'
 
@@ -62,6 +64,8 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
   const hasProcessedComposition = useRef(false)
   // Store the raw input string to preserve leading zeros
   const [rawInputValue, setRawInputValue] = useState<string>('')
+  // Pending cursor restore: digit counts before cursor so we can restore position after format
+  const pendingCursorRef = useRef<{ digitCountStart: number; digitCountEnd: number } | null>(null)
   // Internal state for uncontrolled mode
   const [internalValue, setInternalValue] = useState<NumericInputValue>({
     value: 0,
@@ -108,8 +112,28 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     [separator],
   )
 
+  const scheduleCursorRestore = useCallback(
+    (ctx: { displayValue: string; selectionStart: number; selectionEnd: number }) => {
+      pendingCursorRef.current = {
+        digitCountStart: countDigitsBefore(ctx.displayValue, ctx.selectionStart),
+        digitCountEnd: countDigitsBefore(ctx.displayValue, ctx.selectionEnd),
+      }
+    },
+    [],
+  )
+
   const handleValueChange = useCallback(
-    (inputValue: string, skipCompositionCheck = false) => {
+    (
+      inputValue: string,
+      options?:
+        | boolean
+        | { skipCompositionCheck?: boolean; selectionContext?: { displayValue: string; selectionStart: number; selectionEnd: number } },
+    ) => {
+      const skipCompositionCheck =
+        typeof options === 'boolean' ? options : options?.skipCompositionCheck ?? false
+      const selectionContext =
+        typeof options === 'object' && options?.selectionContext
+
       // During IME composition, update the composing value for display
       // Don't convert full-width to half-width yet - wait for composition end
       if (!skipCompositionCheck && isComposing.current) {
@@ -159,6 +183,9 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
 
       // Handle empty input first (before processing leading zeros)
       if (rawValue === '') {
+        if (selectionContext) {
+          pendingCursorRef.current = { digitCountStart: 0, digitCountEnd: 0 }
+        }
         setRawInputValue('')
         // Mark that user has actively cleared the input
         setUserCleared(true)
@@ -183,6 +210,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       // Handle only minus sign (half-width or full-width converted): preserve it if allowNegative is true
       if (rawValue === '-') {
         if (allowNegative) {
+          if (selectionContext) scheduleCursorRestore(selectionContext)
           setRawInputValue('-')
           const valueObject = {
             value: 0,
@@ -197,6 +225,9 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           return
         } else {
           // If negative is not allowed, treat as empty
+          if (selectionContext) {
+            pendingCursorRef.current = { digitCountStart: 0, digitCountEnd: 0 }
+          }
           setRawInputValue('')
           const valueObject = {
             value: 0,
@@ -249,6 +280,9 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
 
       // Handle invalid numbers
       if (Number.isNaN(valueAsNumber) || !Number.isFinite(valueAsNumber)) {
+        if (selectionContext) {
+          pendingCursorRef.current = { digitCountStart: 0, digitCountEnd: 0 }
+        }
         setRawInputValue('')
         const valueObject = {
           value: 0,
@@ -265,6 +299,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
 
       // Handle value exceeding MAX_SAFE_INTEGER
       if (Math.abs(valueAsNumber) > Number.MAX_SAFE_INTEGER) {
+        if (selectionContext) scheduleCursorRestore(selectionContext)
         const clampedValue =
           valueAsNumber > 0 ? Number.MAX_SAFE_INTEGER : -Number.MAX_SAFE_INTEGER
         const clampedString = clampedValue.toString()
@@ -321,6 +356,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
 
       // If it's a single zero pattern or ends with decimal point, use the raw value for display
       if (isSingleZero || endsWithDecimalPoint) {
+        if (selectionContext) scheduleCursorRestore(selectionContext)
         // Use the raw value as-is to preserve single "0" or trailing decimal point
         const valueObject = {
           value: finalValue,
@@ -336,6 +372,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       }
 
       // Valid number without leading zeros - format and return
+      if (selectionContext) scheduleCursorRestore(selectionContext)
       const valueObject = {
         value: finalValue,
         formattedValue: formatValue(finalValue),
@@ -358,6 +395,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       maxValue,
       maxDecimalPlaces,
       isControlled,
+      scheduleCursorRestore,
     ],
   )
 
@@ -684,6 +722,18 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
 
     return formatValue(numValue)
   }, [value, formatValue, separator, composingValue, rawInputValue, allowNegative, allowDecimal, isControlled, internalValue, userCleared])
+
+  // Restore cursor position after displayValue updates (e.g. after reformatting with separators)
+  useEffect(() => {
+    const pending = pendingCursorRef.current
+    if (!pending || !inputRef.current) return
+    const input = inputRef.current
+    const newStart = positionAfterDigitCount(displayValue, pending.digitCountStart)
+    const newEnd = positionAfterDigitCount(displayValue, pending.digitCountEnd)
+    input.selectionStart = newStart
+    input.selectionEnd = newEnd
+    pendingCursorRef.current = null
+  }, [displayValue])
 
   // Determine appropriate inputMode for mobile keyboards
   const inputMode: 'decimal' | 'numeric' = allowDecimal ? 'decimal' : 'numeric'
