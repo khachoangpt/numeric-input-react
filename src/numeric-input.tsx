@@ -17,6 +17,7 @@ const NumericInput = ({
   onValueChange,
   onCompositionEnd,
   onCompositionStart,
+  onKeyDown,
   ...props
 }: NumericInputProps) => {
   const {
@@ -53,6 +54,45 @@ const NumericInput = ({
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
       onBlur={handleBlur}
+      onKeyDown={(e) => {
+        if (e.key === 'Backspace' && separator) {
+          const target = e.currentTarget
+          const selectionStart = target.selectionStart ?? 0
+          const selectionEnd = target.selectionEnd ?? 0
+          const hasSelection = selectionStart !== selectionEnd
+
+          if (!hasSelection && selectionStart > 0) {
+            const previousChar = target.value[selectionStart - 1]
+            if (previousChar === separator) {
+              let digitIndexToDelete = selectionStart - 2
+
+              while (
+                digitIndexToDelete >= 0 &&
+                !/\d/.test(target.value[digitIndexToDelete] ?? '')
+              ) {
+                digitIndexToDelete--
+              }
+
+              if (digitIndexToDelete >= 0) {
+                e.preventDefault()
+                const nextValue =
+                  target.value.slice(0, digitIndexToDelete) +
+                  target.value.slice(digitIndexToDelete + 1)
+
+                handleValueChange(nextValue, {
+                  selectionContext: {
+                    displayValue: nextValue,
+                    selectionStart: digitIndexToDelete,
+                    selectionEnd: digitIndexToDelete,
+                  },
+                })
+              }
+            }
+          }
+        }
+
+        onKeyDown?.(e)
+      }}
       onChange={(e) => {
         // Skip onChange if we just processed composition to avoid duplicate processing
         // This prevents duplicate when composition end and onChange fire in quick succession

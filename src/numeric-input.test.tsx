@@ -293,6 +293,33 @@ describe('NumericInput', () => {
       // Should not crash with special regex character
       expect(input).toBeInTheDocument()
     })
+
+    it('should delete the digit before separator on backspace right after separator', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} separator="," />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      fireEvent.change(input, { target: { value: '1234' } })
+
+      await waitFor(() => {
+        expect(input).toHaveValue('1,234')
+      })
+
+      input.setSelectionRange(2, 2)
+      fireEvent.keyDown(input, { key: 'Backspace' })
+
+      await waitFor(() => {
+        expect(input).toHaveValue('234')
+      })
+
+      expect(onValueChange).toHaveBeenLastCalledWith({
+        value: 234,
+        formattedValue: '234',
+      })
+      expect(input.selectionStart).toBe(0)
+      expect(input.selectionEnd).toBe(0)
+    })
   })
 
   describe('Leading zeros', () => {
