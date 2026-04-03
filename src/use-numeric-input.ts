@@ -461,14 +461,18 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
       const currentValue = e.target.value
       const shouldPreserveMinus =
         allowNegative && (isMinusSign(rawInputValue) || isMinusSign(currentValue))
+      const isNativeComposing = Boolean(
+        (e.nativeEvent as Event & { isComposing?: boolean }).isComposing,
+      )
 
       // Handle composition states
-      if (isComposing.current) {
-        isComposing.current = false
-        const convertedValue = convertFullWidthToHalfWidth(e.target.value)
-        setComposingValue('')
-        hasProcessedComposition.current = true
-        processConvertedValue(convertedValue)
+      if (isComposing.current || isNativeComposing) {
+        // Some IMEs on Windows (e.g. Google Japanese Input) can blur before
+        // composition is confirmed. Avoid finalizing on blur; wait for compositionend.
+        if (onBlur) {
+          onBlur(e)
+        }
+        return
       } else if (composingValue !== '') {
         const convertedValue = convertFullWidthToHalfWidth(composingValue)
         processConvertedValue(convertedValue)

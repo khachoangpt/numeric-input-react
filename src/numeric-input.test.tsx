@@ -582,10 +582,22 @@ describe('NumericInput', () => {
       fireEvent.compositionStart(input)
       fireEvent.change(input, { target: { value: '－' } })
       
-      // Blur during composition - this should trigger handleValueChange which converts full-width to half-width
+      // Blur during composition should not finalize IME value yet
       fireEvent.blur(input)
 
-      // Minus sign should be preserved and converted to half-width after blur
+      // Value remains in composing state until composition ends
+      await waitFor(() => {
+        expect(input).toHaveValue('－')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: 0,
+          formattedValue: '－',
+        })
+      })
+
+      fireEvent.compositionEnd(input, {
+        data: '－',
+      } as CompositionEvent)
+
       await waitFor(() => {
         expect(input).toHaveValue('-')
         expect(onValueChange).toHaveBeenLastCalledWith({
@@ -678,15 +690,15 @@ describe('NumericInput', () => {
       fireEvent.compositionStart(input)
       fireEvent.change(input, { target: { value: '－' } })
       
-      // Blur during composition - should convert to half-width and preserve
+      // Blur during composition should not convert before IME confirms
       fireEvent.blur(input)
 
-      // Minus sign should be preserved and converted to half-width after blur
+      // Keep composing value as-is
       await waitFor(() => {
-        expect(input).toHaveValue('-')
+        expect(input).toHaveValue('－')
         expect(onValueChange).toHaveBeenLastCalledWith({
           value: 0,
-          formattedValue: '-',
+          formattedValue: '－',
         })
       })
     })
