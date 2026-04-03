@@ -55,37 +55,68 @@ const NumericInput = ({
       onCompositionStart={handleCompositionStart}
       onBlur={handleBlur}
       onKeyDown={(e) => {
-        if (e.key === 'Backspace' && separator) {
+        if ((e.key === 'Backspace' || e.key === 'Delete') && separator) {
           const target = e.currentTarget
           const selectionStart = target.selectionStart ?? 0
           const selectionEnd = target.selectionEnd ?? 0
           const hasSelection = selectionStart !== selectionEnd
 
-          if (!hasSelection && selectionStart > 0) {
-            const previousChar = target.value[selectionStart - 1]
-            if (previousChar === separator) {
-              let digitIndexToDelete = selectionStart - 2
+          if (e.key === 'Backspace') {
+            if (!hasSelection && selectionStart > 0) {
+              const previousChar = target.value[selectionStart - 1]
+              if (previousChar === separator) {
+                let digitIndexToDelete = selectionStart - 2
 
-              while (
-                digitIndexToDelete >= 0 &&
-                !/\d/.test(target.value[digitIndexToDelete] ?? '')
-              ) {
-                digitIndexToDelete--
+                while (
+                  digitIndexToDelete >= 0 &&
+                  !/\d/.test(target.value[digitIndexToDelete] ?? '')
+                ) {
+                  digitIndexToDelete--
+                }
+
+                if (digitIndexToDelete >= 0) {
+                  e.preventDefault()
+                  const nextValue =
+                    target.value.slice(0, digitIndexToDelete) +
+                    target.value.slice(digitIndexToDelete + 1)
+
+                  handleValueChange(nextValue, {
+                    selectionContext: {
+                      displayValue: nextValue,
+                      selectionStart: digitIndexToDelete,
+                      selectionEnd: digitIndexToDelete,
+                    },
+                  })
+                }
               }
+            }
+          } else if (e.key === 'Delete') {
+            if (!hasSelection && selectionStart < target.value.length) {
+              const currentChar = target.value[selectionStart]
+              if (currentChar === separator) {
+                let digitIndexToDelete = selectionStart + 1
 
-              if (digitIndexToDelete >= 0) {
-                e.preventDefault()
-                const nextValue =
-                  target.value.slice(0, digitIndexToDelete) +
-                  target.value.slice(digitIndexToDelete + 1)
+                while (
+                  digitIndexToDelete < target.value.length &&
+                  !/\d/.test(target.value[digitIndexToDelete] ?? '')
+                ) {
+                  digitIndexToDelete++
+                }
 
-                handleValueChange(nextValue, {
-                  selectionContext: {
-                    displayValue: nextValue,
-                    selectionStart: digitIndexToDelete,
-                    selectionEnd: digitIndexToDelete,
-                  },
-                })
+                if (digitIndexToDelete < target.value.length) {
+                  e.preventDefault()
+                  const nextValue =
+                    target.value.slice(0, digitIndexToDelete) +
+                    target.value.slice(digitIndexToDelete + 1)
+
+                  handleValueChange(nextValue, {
+                    selectionContext: {
+                      displayValue: nextValue,
+                      selectionStart: selectionStart,
+                      selectionEnd: selectionStart,
+                    },
+                  })
+                }
               }
             }
           }

@@ -320,6 +320,33 @@ describe('NumericInput', () => {
       expect(input.selectionStart).toBe(0)
       expect(input.selectionEnd).toBe(0)
     })
+
+    it('should delete the digit after separator on delete right before separator', async () => {
+      render(
+        <NumericInput onValueChange={onValueChange} separator="," />,
+      )
+
+      const input = screen.getByRole('textbox') as HTMLInputElement
+      fireEvent.change(input, { target: { value: '1234' } })
+
+      await waitFor(() => {
+        expect(input).toHaveValue('1,234')
+      })
+
+      input.setSelectionRange(1, 1)
+      fireEvent.keyDown(input, { key: 'Delete' })
+
+      await waitFor(() => {
+        expect(input).toHaveValue('134')
+      })
+
+      expect(onValueChange).toHaveBeenLastCalledWith({
+        value: 134,
+        formattedValue: '134',
+      })
+      expect(input.selectionStart).toBe(1)
+      expect(input.selectionEnd).toBe(1)
+    })
   })
 
   describe('Leading zeros', () => {
