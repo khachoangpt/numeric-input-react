@@ -68,7 +68,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
   const pendingCursorRef = useRef<{ digitCountStart: number; digitCountEnd: number } | null>(null)
   // Internal state for uncontrolled mode
   const [internalValue, setInternalValue] = useState<NumericInputValue>({
-    value: 0,
+    value: undefined,
     formattedValue: '',
   })
   // Track previous value prop to detect external changes
@@ -190,7 +190,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
         // Mark that user has actively cleared the input
         setUserCleared(true)
         const valueObject = {
-          value: 0,
+          value: undefined,
           formattedValue: '',
         }
         if (onValueChange) {
@@ -230,7 +230,7 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
           }
           setRawInputValue('')
           const valueObject = {
-            value: 0,
+            value: undefined,
             formattedValue: '',
           }
           if (isControlled && onValueChange) {
@@ -753,4 +753,3 @@ export const useNumericInput = (options: UseNumericInputOptions) => {
     handleCompositionStart,
   }
 }
-

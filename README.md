@@ -26,7 +26,7 @@ npm install numeric-input-react
 import { NumericInput } from 'numeric-input-react'
 
 function App() {
-  const [value, setValue] = useState({ value: 0, formattedValue: '' })
+  const [value, setValue] = useState({ value: undefined, formattedValue: '' })
 
   return (
     <NumericInput
@@ -62,7 +62,7 @@ The callback receives an object with:
 
 ```typescript
 type NumericInputValue = {
-  value: number        // The numeric value
+  value: number | undefined // The numeric value, or undefined when empty
   formattedValue: string // The formatted string (with separator if provided)
 }
 ```

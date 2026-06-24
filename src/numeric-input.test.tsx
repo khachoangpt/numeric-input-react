@@ -732,19 +732,23 @@ describe('NumericInput', () => {
   })
 
   describe('Empty and edge cases', () => {
-    it('should handle empty input', () => {
+    it('should handle empty input', async () => {
       render(<NumericInput onValueChange={onValueChange} />)
 
       const input = screen.getByRole('textbox')
-      // Test that empty input doesn't crash and input is empty
+      fireEvent.change(input, { target: { value: '123' } })
       fireEvent.change(input, { target: { value: '' } })
 
       // Component should handle empty input gracefully
       // The input value should be empty
       expect(input).toHaveValue('')
       
-      // onValueChange should be called with empty formattedValue when input is cleared
-      // This is tested indirectly through other tests that clear input
+      await waitFor(() => {
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: undefined,
+          formattedValue: '',
+        })
+      })
     })
 
     it('should handle only minus sign', async () => {
@@ -966,7 +970,7 @@ describe('NumericInput', () => {
 
       await waitFor(() => {
         expect(onValueChange).toHaveBeenLastCalledWith({
-          value: 0,
+          value: undefined,
           formattedValue: '',
         })
       })
@@ -1172,6 +1176,10 @@ describe('NumericInput', () => {
       // After clearing, should show empty, not "0"
       await waitFor(() => {
         expect(input).toHaveValue('')
+        expect(onValueChange).toHaveBeenLastCalledWith({
+          value: undefined,
+          formattedValue: '',
+        })
       })
     })
 
@@ -1192,4 +1200,3 @@ describe('NumericInput', () => {
     })
   })
 })
-

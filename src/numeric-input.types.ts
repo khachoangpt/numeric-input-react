@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
 
 export type NumericInputValue = {
-  value: number
+  value: number | undefined
   formattedValue: string
 }
 
@@ -14,4 +14,3 @@ export type NumericInputProps = ComponentProps<'input'> & {
   maxValue?: number
   maxDecimalPlaces?: number
 }
-
