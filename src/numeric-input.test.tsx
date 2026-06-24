@@ -1145,7 +1145,7 @@ describe('NumericInput', () => {
           // The input should show a value that respects maxLength
           const lastCall = onValueChange.mock.calls[onValueChange.mock.calls.length - 1]
           // The raw input should be limited to 5 digits
-          expect(lastCall[0].value.toString().replace(/[^0-9]/g, '').length).toBeLessThanOrEqual(5)
+          expect(lastCall[0].value?.toString().replace(/[^0-9]/g, '').length).toBeLessThanOrEqual(5)
         },
         { timeout: 1000 },
       )
